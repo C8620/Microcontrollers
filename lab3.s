@@ -1,12 +1,25 @@
+; Capabilities:
+; Basic:    Print given strings.
+; Advanced: Print different strings on different lines of the Display.
+;           With: Automatically detect current line and switch to another.
+;                 Detect \n and \r in strings, and preform a line change. 
+
+; ----------------------------------------------
+; MAIN PROGRAM
+
             ADR     SP, stack_top               ; Initialise the Stack
-            BL      lcd_reset
-            BL      lcd_lights
-            ADR     R10, str1
-            BL      lcd_prints
-            BL      lcd_line2
-            ADR     R10, str2
-            BL      lcd_prints
-            B       fin
+            BL      lcd_reset                   ; Reset the LCD unit. Clear everything.
+            BL      lcd_lights                  ; Turn on the backlight on LCD, if not already.
+            ADR     R10, str1                   ; Load the address of the String 1.
+            BL      lcd_prints                  ; Print the String 1.
+            BL      lcd_chglne                  ; Change to the other line.
+            ADR     R10, str2                   ; Load the address of the String 2.
+            BL      lcd_prints                  ; Print the String 2.
+            BL      lcd_chglne                  ; Change to the other line.
+        ; Printing of String 3 is commented, as it contains two lines and will overwrite previous strings.
+            ;ADR     R10, str3                   ; Load the address of the String 3.
+            ;BL      lcd_prints                  ; Print the String 2 in 2 lines.
+            B       fin                         ; End of it! Bye!
 
 ; ----------------------------------------------
 ; function lcd_reset: reset the display.
@@ -18,6 +31,32 @@ lcd_reset   PUSH    {LR, R9-R12}
             STRB    R11, [R9]                   ; Write new control values
             LDR     R10, port_a                 ; Load address for PORT A
             MOV     R12, #:00000001             ; Load reset instruction to R12
+            STRB    R12, [R10]                  ; Save instruction to port A
+            BL      bus_on                      ; Commit changes
+            BL      bus_off                     ; Reset state.
+            POP     {LR, R9-R12}
+            MOV     PC, LR
+
+; ----------------------------------------------
+; function lcd_chglne: Change the cursor to the start the another line of the LCD.
+lcd_chglne  PUSH    {LR, R9-R12}
+            BL      lcd_idle                    ; Wait until idle.
+            LDR     R9, port_b                  ; Read current control values
+            LDRB    R11, [R9]                   
+            AND     R11, R11, #:11111101        ; Change RS  = 0
+            ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
+            STRB    R11, [R9]                   ; Write new control values
+            BL      bus_on                      ; Enable Bus
+            LDR     R10, port_a                 ; Read status byte to R12
+            LDRB    R12, [R10]
+            BL      bus_off  
+            EOR     R12, R12, #:01000000        ; Change line bit.
+            AND     R12, R12, #:01000000        ; Leave only line bit.
+            ORR     R12, R12, #:10000000        ; Change first bit as 1.
+
+            BL      lcd_idle                    ; Wait until idle                
+            AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
+            STRB    R11, [R9]                   ; Write new control values
             STRB    R12, [R10]                  ; Save instruction to port A
             BL      bus_on                      ; Commit changes
             BL      bus_off                     ; Reset state.
@@ -63,7 +102,7 @@ lcd_prints  PUSH    {R10-R14}
 lcd_p_loop  LDR     R10, [R11]
             CMP     R10, #0
             BEQ     lcd_p_exit
-            BL      lcd_write
+            BL      lcd_printc
             ADD     R11, R11, #4
             B       lcd_p_loop
 lcd_p_exit  POP     {R10-R14}
@@ -72,9 +111,14 @@ lcd_p_exit  POP     {R10-R14}
 ; ----------------------------------------------
 ; function lcd_printc:  print a string pointed by R10. R10 is memory location. String must end with 0.
 lcd_printc  PUSH    {R10-R14}
-            MOV     R11, R10
-
-            POP     {R10-R14}
+            CMP     R10, #&0D                   ; Carriage Return
+            ADREQ   LR, lcp_pc_end              ; Set end of this function to LR.
+            BEQ     lcd_chglne
+            CMP     R10, #&0A                   ; Newline
+            ADREQ   LR, lcp_pc_end              ; Set end of this function to LR.
+            BEQ     lcd_chglne
+            BL      lcd_write                   ; Good character, print!
+lcp_pc_end  POP     {R10-R14}
             MOV     PC, LR
 
 ; ----------------------------------------------
@@ -153,8 +197,9 @@ port_b      DEFW    &1000_0004
 ; Sample strings to print!
 str1        DEFW    "Hello World!", 0
 str2        DEFW    "Hachiroku.uk", 0           ; Actually, valid address!
+str3        DEFW    "Higan\nEruthyll", 0
 
 ; ----------------------------------------------
 ; Stack Memory
-stack       DEFS    256
+stack       DEFS    128
 stack_top   DEFW    0                           ; First unused location od stack
