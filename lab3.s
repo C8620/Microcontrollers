@@ -1,3 +1,12 @@
+; ============================================================================
+;           COMP227 AY2022/23 Exercise 3
+; Author:   Yang Hu
+; Uni ID:   10827802
+; Date:     Fri, 17 Feb 2023
+; Email:    yang.hu-6@student.manchester.ac.uk; yanghu22@acm.org
+; ============================================================================
+
+
 ; Capabilities:
 ; Basic:    Print given strings.
 ; Advanced: Print different strings on different lines of the Display.
