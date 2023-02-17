@@ -1,10 +1,60 @@
             ADR     SP, stack_top               ; Initialise the Stack
+            BL      lcd_reset
             BL      lcd_lights
             ADR     R10, str1
             BL      lcd_prints
+            BL      lcd_line2
             ADR     R10, str2
             BL      lcd_prints
             B       fin
+
+; ----------------------------------------------
+; function lcd_reset: reset the display.
+lcd_reset   PUSH    {LR, R9-R12}
+            BL      lcd_idle
+            LDR     R9, port_b                  ; Read current control values
+            LDRB    R11, [R9]                   
+            AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
+            STRB    R11, [R9]                   ; Write new control values
+            LDR     R10, port_a                 ; Load address for PORT A
+            MOV     R12, #:00000001             ; Load reset instruction to R12
+            STRB    R12, [R10]                  ; Save instruction to port A
+            BL      bus_on                      ; Commit changes
+            BL      bus_off                     ; Reset state.
+            POP     {LR, R9-R12}
+            MOV     PC, LR
+
+; ----------------------------------------------
+; function lcd_line1: Move cursor of the LCD to the start of 1st line.
+lcd_line1   PUSH    {LR, R9-R12}
+            BL      lcd_idle                    ; Wait until idle.
+            LDR     R9, port_b                  ; Read current control values
+            LDRB    R11, [R9]                   
+            AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
+            STRB    R11, [R9]                   ; Write new control values
+            LDR     R10, port_a                 ; Load address for PORT A
+            MOV     R12, #:10000000             ; Load reset instruction to R12
+            STRB    R12, [R10]                  ; Save instruction to port A
+            BL      bus_on                      ; Commit changes
+            BL      bus_off                     ; Reset state.
+            POP     {LR, R9-R12}
+            MOV     PC, LR
+
+; ----------------------------------------------
+; function lcd_line2: Move cursor of the LCD to the start of 2nd line.
+lcd_line2   PUSH    {LR, R9-R12}
+            BL      lcd_idle                    ; Wait until idle.
+            LDR     R9, port_b                  ; Read current control values
+            LDRB    R11, [R9]                   
+            AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
+            STRB    R11, [R9]                   ; Write new control values
+            LDR     R10, port_a                 ; Load address for PORT A
+            MOV     R12, #:11000000             ; Load reset instruction to R12
+            STRB    R12, [R10]                  ; Save instruction to port A
+            BL      bus_on                      ; Commit changes
+            BL      bus_off                     ; Reset state.
+            POP     {LR, R9-R12}
+            MOV     PC, LR
 
 ; ----------------------------------------------
 ; function lcd_prints:  print a string pointed by R10. R10 is memory location. String must end with 0.
@@ -20,11 +70,11 @@ lcd_p_exit  POP     {R10-R14}
             MOV     PC, LR
 
 ; ----------------------------------------------
-; function lcd_prints:  print a string pointed by R10. R10 is memory location. String must end with 0.
+; function lcd_printc:  print a string pointed by R10. R10 is memory location. String must end with 0.
 lcd_printc  PUSH    {R10-R14}
             MOV     R11, R10
 
-lcd_p_exit  POP     {R10-R14}
+            POP     {R10-R14}
             MOV     PC, LR
 
 ; ----------------------------------------------
@@ -101,8 +151,8 @@ port_b      DEFW    &1000_0004
 
 ; ----------------------------------------------
 ; Sample strings to print!
-str1        DEFW    &48, &65, &6C, &6C, &6F, &20, &57, &6F, &72, &6C, &64, &21, &0D, 0
-str2        DEFW    &48, &41, &43, &48, &49, &52, &4F, &4B, &55, &2E, &55, &4B, 0
+str1        DEFW    "Hello World!", 0
+str2        DEFW    "Hachiroku.uk", 0           ; Actually, valid address!
 
 ; ----------------------------------------------
 ; Stack Memory
