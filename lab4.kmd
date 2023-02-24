@@ -1,0 +1,281 @@
+KMD
+00000000:             ; ; ============================================================================
+00000000:             ; ;           COMP227 AY2022/23 Exercise 4
+00000000:             ; ; Author:   Yang Hu
+00000000:             ; ; Uni ID:   10827802
+00000000:             ; ; Date:     !!UNFINISHED!!
+00000000:             ; ; Email:    yang.hu-6@student.manchester.ac.uk; yanghu22@acm.org
+00000000:             ; ; ============================================================================
+00000000:             ; 
+00000000:             ; 
+00000000:             ; 
+00000000:             ; ;=============================================================================
+00000000:             ; ; SYSTEM INSTRUCTIONS, MEMORY, AND OPERAION HANDLING.
+00000000:             ; 
+00000000: E28FDFA7    ;             ADR     SP, stack_top               ; Initialise the Supervisor Stack
+00000004: EA000005    ;             B       INIT_user                   ; Head to the initialisation section
+00000008: EA000008    ; SVC_entry   B       SVC_switch                  ; SVC call
+0000000C: EAFFFFFE    ; pref_abrt   B       pref_abrt                   ; Prefetch abort
+00000010: EAFFFFFE    ; data_abrt   B       data_abrt                   ; Data abort
+00000014: E1A00000    ;             MOV     R0, R0                      ;
+00000018: EAFFFFFE    ; IRQ_entry   B       IRQ_entry                   ; Interrupt
+0000001C: EAFFFFFE    ; FIQ_entry   B       FIQ_entry                   ; Fast interrupt
+00000020:             ; 
+00000020: E3A000D0    ; INIT_user   MOV     R0, #&D0                    ; User mode, no ints.
+00000024: E16FF000    ;             MSR     SPSR, R0                    ;
+00000028: E28F0F9E    ;             ADRL    R0, APPLICATION             ; Load user code address
+0000002C: E1B0F000    ;             MOVS    PC, R0                      ; ‘Return’ to user code
+00000030:             ; 
+00000030: E92D4003    ; SVC_switch  PUSH    {LR, R0-R1}                    ; Protect registers - restore on exit.
+00000034: E51E0004    ;             LDR     R0, [LR, #-4]               ; Load calling SVC instruction.
+00000038: E59F103C    ;             LDR     R1, op_remove               ;
+0000003C: E0000001    ;             AND     R0, R0, R1                  ; Remove the SVC instruction.
+00000040: E3500005    ;             CMP     R0, #5                      ; Check if mapping exist.
+00000044: 8A000009    ;             BHI     SVC_default                 ; No mapping - run default.
+00000048: E28F100C    ;             ADR     R1, SVC_funcs               ; Load starting point of jump table
+0000004C: E28FE000    ;             ADR     LR, SVC_exit                ; Load return address- SVC_exit
+00000050: E791F100    ;             LDR     PC, [R1, R0, LSL #2]        ; Load corresponding address.
+00000054:             ; 
+00000054: E8BD4003    ; SVC_exit    POP     {LR, R0-R1}                    ; Restore user memory.
+00000058: E1B0F00E    ;             MOVS    PC, LR                      ; Exit service mode.
+0000005C: 00000220    ; SVC_funcs   DEFW    fin                         ; SVC 0: Exit, enter infinite loop.
+00000060: 00000134    ;             DEFW    lcd_printc                  ; SVC 1: Print character in R10.
+00000064: 0000010C    ;             DEFW    lcd_prints                  ; SVC 2: Print string pointed by R10.
+00000068: 0000015C    ;             DEFW    lcd_lights                  ; SVC 3: Trun on the LCD backlight.
+0000006C: 00000080    ;             DEFW    lcd_reset                   ; SVC 4: Reset the LCD.
+00000070:             ;             ALIGN                               ; Prevent anything out of order.
+00000070: EAFFFFFE    ; SVC_default B       SVC_default                 ; No mapping.
+00000074:             ; 
+00000074:             ; 
+00000074:             ; ; ----------------------------------------------
+00000074:             ; ; Static memory pointer to the buses for LCD
+00000074: 10000000    ; port_a      DEFW    &1000_0000
+00000078: 10000004    ; port_b      DEFW    &1000_0004
+0000007C:             ; 
+0000007C:             ; ; ----------------------------------------------
+0000007C: 00FFFFFF    ; op_remove   DEFW    &00FF_FFFF
+00000080:             ; 
+00000080:             ; ; ----------------------------------------------
+00000080:             ; ; function lcd_reset: reset the display.
+00000080: E92D5E00    ; lcd_reset   PUSH    {LR, R9-R12}
+00000084: EB00003B    ;             BL      lcd_idle
+00000088: E51F9018    ;             LDR     R9, port_b                  ; Read current control values
+0000008C: E559B000    ;             LDRB    R11, [R9]                   
+00000090: E20BB0F9    ;             AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
+00000094: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000098: E51FA02C    ;             LDR     R10, port_a                 ; Load address for PORT A
+0000009C: E3A0C001    ;             MOV     R12, #:00000001             ; Load reset instruction to R12
+000000A0: E54AC000    ;             STRB    R12, [R10]                  ; Save instruction to port A
+000000A4: EB00004F    ;             BL      bus_on                      ; Commit changes
+000000A8: EB000055    ;             BL      bus_off                     ; Reset state.
+000000AC: E8BD5E00    ;             POP     {LR, R9-R12}
+000000B0: E1A0F00E    ;             MOV     PC, LR
+000000B4:             ; 
+000000B4:             ; ; ----------------------------------------------
+000000B4:             ; ; function lcd_chglne: Change the cursor to the start the another line of the LCD.
+000000B4: E92D5E00    ; lcd_chglne  PUSH    {LR, R9-R12}
+000000B8: EB00002E    ;             BL      lcd_idle                    ; Wait until idle.
+000000BC: E51F904C    ;             LDR     R9, port_b                  ; Read current control values
+000000C0: E559B000    ;             LDRB    R11, [R9]                   
+000000C4: E20BB0FD    ;             AND     R11, R11, #:11111101        ; Change RS  = 0
+000000C8: E38BB004    ;             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
+000000CC: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+000000D0: EB000044    ;             BL      bus_on                      ; Enable Bus
+000000D4: E51FA068    ;             LDR     R10, port_a                 ; Read status byte to R12
+000000D8: E55AC000    ;             LDRB    R12, [R10]
+000000DC: EB000048    ;             BL      bus_off  
+000000E0: E22CC040    ;             EOR     R12, R12, #:01000000        ; Change line bit.
+000000E4: E20CC040    ;             AND     R12, R12, #:01000000        ; Leave only line bit.
+000000E8: E38CC080    ;             ORR     R12, R12, #:10000000        ; Change first bit as 1.
+000000EC:             ; 
+000000EC: EB000021    ;             BL      lcd_idle                    ; Wait until idle                
+000000F0: E20BB0F9    ;             AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
+000000F4: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+000000F8: E54AC000    ;             STRB    R12, [R10]                  ; Save instruction to port A
+000000FC: EB000039    ;             BL      bus_on                      ; Commit changes
+00000100: EB00003F    ;             BL      bus_off                     ; Reset state.
+00000104: E8BD5E00    ;             POP     {LR, R9-R12}
+00000108: E1A0F00E    ;             MOV     PC, LR
+0000010C:             ; 
+0000010C:             ; ; ----------------------------------------------
+0000010C:             ; ; function lcd_prints:  print a string pointed by R10. R10 is memory location. String must end 
+                      ; with 0.
+0000010C: E92D7C00    ; lcd_prints  PUSH    {R10-R14}
+00000110: E1A0B00A    ;             MOV     R11, R10
+00000114: E51BA000    ; lcd_p_loop  LDR     R10, [R11]
+00000118: E35A0000    ;             CMP     R10, #0
+0000011C: 0A000002    ;             BEQ     lcd_p_exit
+00000120: EB000003    ;             BL      lcd_printc
+00000124: E28BB004    ;             ADD     R11, R11, #4
+00000128: EAFFFFF9    ;             B       lcd_p_loop
+0000012C: E8BD7C00    ; lcd_p_exit  POP     {R10-R14}
+00000130: E1A0F00E    ;             MOV     PC, LR
+00000134:             ; 
+00000134:             ; ; ----------------------------------------------
+00000134:             ; ; function lcd_printc:  print a string pointed by R10. R10 is memory location. String must end 
+                      ; with 0.
+00000134: E92D7C00    ; lcd_printc  PUSH    {R10-R14}
+00000138: E35A000D    ;             CMP     R10, #&0D                   ; Carriage Return
+0000013C: 028FE010    ;             ADREQ   LR, lcp_pc_end              ; Set end of this function to LR.
+00000140: 0AFFFFDB    ;             BEQ     lcd_chglne
+00000144: E35A000A    ;             CMP     R10, #&0A                   ; Newline
+00000148: 028FE004    ;             ADREQ   LR, lcp_pc_end              ; Set end of this function to LR.
+0000014C: 0AFFFFD8    ;             BEQ     lcd_chglne
+00000150: EB000017    ;             BL      lcd_write                   ; Good character, print!
+00000154: E8BD7C00    ; lcp_pc_end  POP     {R10-R14}
+00000158: E1A0F00E    ;             MOV     PC, LR
+0000015C:             ; 
+0000015C:             ; ; ----------------------------------------------
+0000015C:             ; ; function lcd_lights: turn on the backlight of the LCD
+0000015C: E92D0A00    ; lcd_lights  PUSH    {R9, R11}
+00000160: E51F90F0    ;             LDR     R9, port_b                  ; Read current control values
+00000164: E559B000    ;             LDRB    R11, [R9]
+00000168: E38BB020    ;             ORR     R11, R11, #:00100000        ; Set Backlight to High, preserve everything el
+                      ; se.
+0000016C: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000170: E8BD0A00    ;             POP     {R9, R11}
+00000174: E1A0F00E    ;             MOV     PC, LR                      ; Return
+00000178:             ; 
+00000178:             ; ; ----------------------------------------------
+00000178:             ; ; function lcd_idle: wait until lcd is not busy.
+00000178: E92D5A00    ; lcd_idle    PUSH    {LR, R9, R11, R12}
+0000017C: E51F910C    ; li_s1       LDR     R9, port_b                  ; Read current control values
+00000180: E559B000    ;             LDRB    R11, [R9]                   
+00000184: E20BB0FD    ;             AND     R11, R11, #:11111101        ; Change RS  = 0
+00000188: E38BB004    ;             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
+0000018C: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000190: EB000014    ; li_s2       BL      bus_on                      ; Enable Bus
+00000194: E51F9128    ; li_s3       LDR     R9, port_a                  ; Read status byte
+00000198: E559C000    ;             LDRB    R12, [R9]                   
+0000019C: EB000018    ; li_s4       BL      bus_off                     ; Disable Bus
+000001A0: E20CC080    ; li_s5       AND     R12, R12, #:10000000        ; Get only bit 7 of status byte
+000001A4: E35C0080    ;             CMP     R12, #:10000000             ; Is bit 7 of status byte high?
+000001A8: 0AFFFFF8    ;             BEQ     li_s2                       ; Yes, check again
+000001AC: E8BD5A00    ;             POP     {LR, R9, R11, R12}
+000001B0: E1A0F00E    ;             MOV     PC, LR                      ; No, LCD is idle now. Return.
+000001B4:             ; 
+000001B4:             ; ; ----------------------------------------------
+000001B4:             ; ; function lcd_write: write the character given by R10 to LCD.
+000001B4: E92D4F00    ; lcd_write   PUSH    {LR, R8-R11}
+000001B8: EBFFFFEE    ;             BL      lcd_idle                    ; Step 1-5, wait until idle.
+000001BC: E51F914C    ; lw_s6       LDR     R9, port_b                  ; Read current control values
+000001C0: E559B000    ;             LDRB    R11, [R9]             
+000001C4: E38BB002    ;             ORR     R11, R11, #:00000010        ; Change RS  = 1
+000001C8: E20BB0FB    ;             AND     R11, R11, #:11111011        ; Change R/W = 0 (Write)
+000001CC: E549B000    ;             STRB    R11, [R9]                   ; Write new control byte to Data.
+000001D0: E51F8164    ; lw_s7       LDR     R8, port_a                  ; Write data byte to data bus.
+000001D4: E548A000    ;             STRB    R10, [R8]
+000001D8: EB000002    ; lw_s8       BL      bus_on
+000001DC: EB000008    ; lw_s9       BL      bus_off
+000001E0: E8BD4F00    ;             POP     {LR, R8-R11}
+000001E4: E1A0F00E    ;             MOV     PC, LR                      ; Returns
+000001E8:             ; 
+000001E8:             ; ; ----------------------------------------------
+000001E8:             ; ; function bus_on: enable bus
+000001E8: E92D0A00    ; bus_on      PUSH    {R9, R11}
+000001EC: E51F917C    ;             LDR     R9, port_b                  ; Read current control values
+000001F0: E559B000    ;             LDRB    R11, [R9]             
+000001F4: E38BB001    ;             ORR     R11, R11, #:00000001        ; Set E to High, preserve everything else.
+000001F8: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+000001FC: E8BD0A00    ;             POP     {R9, R11}
+00000200: E1A0F00E    ;             MOV     PC, LR                      ; Return
+00000204:             ; 
+00000204:             ; ; ----------------------------------------------
+00000204:             ; ; function bus_off: disable bus
+00000204: E92D0A00    ; bus_off     PUSH    {R9, R11}
+00000208: E51F9198    ;             LDR     R9, port_b                  ; Read current control values
+0000020C: E559B000    ;             LDRB    R11, [R9]             
+00000210: E20BB0FE    ;             AND     R11, R11, #:11111110        ; Set E to Low, preserve everything else.
+00000214: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000218: E8BD0A00    ;             POP     {R9, R11}
+0000021C: E1A0F00E    ;             MOV     PC, LR                      ; Return
+00000220:             ; 
+00000220: EAFFFFFE    ; fin         B       fin                         ; Infinite loop. Halt.
+00000224:             ; 
+00000224:             ; ; ----------------------------------------------
+00000224:             ; ; System Stack Memory
+00000224:             ; stack       DEFS    128
+000002A4: 00000000    ; stack_top   DEFW    0                           ; First unused location od stacks
+000002A8:             ; 
+000002A8:             ; ; ============================================================================
+000002A8:             ; ; USER INSTRUCION, MEMORY, AND PROGRAMS.
+000002A8: E28FD08C    ; APPLICATION ADR     SP, usrStackTop             ; Initialise the User Stack
+000002AC: EF000004    ;             SVC     4                           ; Reset the LCD unit. Clear everything.
+000002B0: EF000003    ;             SVC     3                           ; Light up the LCD unit.
+000002B4: E28FA004    ;             ADR     R10, usrStr                 ; Load the address of the user String.
+000002B8: EF000002    ;             SVC     2                           ; Print string.
+000002BC: EF000000    ;             SVC     0                           ; Everything. Bye!
+000002C0:             ; 
+000002C0:             ; ; ----------------------------------------------
+000002C0: 00000043    ; usrStr      DEFW    "C86.ac.cn\nHachiroku.uk", 0
+000002C4: 00000038    ; 
+000002C8: 00000036    ; 
+000002CC: 0000002E    ; 
+000002D0: 00000061    ; 
+000002D4: 00000063    ; 
+000002D8: 0000002E    ; 
+000002DC: 00000063    ; 
+000002E0: 0000006E    ; 
+000002E4: 0000000A    ; 
+000002E8: 00000048    ; 
+000002EC: 00000061    ; 
+000002F0: 00000063    ; 
+000002F4: 00000068    ; 
+000002F8: 00000069    ; 
+000002FC: 00000072    ; 
+00000300: 0000006F    ; 
+00000304: 0000006B    ; 
+00000308: 00000075    ; 
+0000030C: 0000002E    ; 
+00000310: 00000075    ; 
+00000314: 0000006B    ; 
+00000318: 00000000    ; 
+0000031C:             ; 
+0000031C:             ; ; ----------------------------------------------
+0000031C:             ; ; User Stack Memory
+0000031C:             ; usrStack    DEFS    32
+0000033C: 00000000    ; usrStackTop DEFW    0                           ; First unused location od stack
+00000340:             ; 
+
+Symbol Table: Labels
+: SVC_entry                         00000008  Local -- ARM
+: pref_abrt                         0000000C  Local -- ARM
+: data_abrt                         00000010  Local -- ARM
+: IRQ_entry                         00000018  Local -- ARM
+: FIQ_entry                         0000001C  Local -- ARM
+: INIT_user                         00000020  Local -- ARM
+: SVC_switch                        00000030  Local -- ARM
+: SVC_exit                          00000054  Local -- ARM
+: SVC_funcs                         0000005C  Local -- ARM
+: SVC_default                       00000070  Local -- ARM
+: port_a                            00000074  Local -- ARM
+: port_b                            00000078  Local -- ARM
+: op_remove                         0000007C  Local -- ARM
+: lcd_reset                         00000080  Local -- ARM
+: lcd_chglne                        000000B4  Local -- ARM
+: lcd_prints                        0000010C  Local -- ARM
+: lcd_p_loop                        00000114  Local -- ARM
+: lcd_p_exit                        0000012C  Local -- ARM
+: lcd_printc                        00000134  Local -- ARM
+: lcp_pc_end                        00000154  Local -- ARM
+: lcd_lights                        0000015C  Local -- ARM
+: lcd_idle                          00000178  Local -- ARM
+: li_s1                             0000017C  Local -- ARM
+: li_s2                             00000190  Local -- ARM
+: li_s3                             00000194  Local -- ARM
+: li_s4                             0000019C  Local -- ARM
+: li_s5                             000001A0  Local -- ARM
+: lcd_write                         000001B4  Local -- ARM
+: lw_s6                             000001BC  Local -- ARM
+: lw_s7                             000001D0  Local -- ARM
+: lw_s8                             000001D8  Local -- ARM
+: lw_s9                             000001DC  Local -- ARM
+: bus_on                            000001E8  Local -- ARM
+: bus_off                           00000204  Local -- ARM
+: fin                               00000220  Local -- ARM
+: stack                             00000224  Local -- ARM
+: stack_top                         000002A4  Local -- ARM
+: APPLICATION                       000002A8  Local -- ARM
+: usrStr                            000002C0  Local -- ARM
+: usrStack                          0000031C  Local -- ARM
+: usrStackTop                       0000033C  Local -- ARM

@@ -1,4 +1,13 @@
 KMD
+00000000:             ; ; ============================================================================
+00000000:             ; ;           COMP227 AY2022/23 Exercise 3
+00000000:             ; ; Author:   Yang Hu
+00000000:             ; ; Uni ID:   10827802
+00000000:             ; ; Date:     Fri, 17 Feb 2023
+00000000:             ; ; Email:    yang.hu-6@student.manchester.ac.uk; yanghu22@acm.org
+00000000:             ; ; ============================================================================
+00000000:             ; 
+00000000:             ; 
 00000000:             ; ; Capabilities:
 00000000:             ; ; Basic:    Print given strings.
 00000000:             ; ; Advanced: Print different strings on different lines of the Display.
