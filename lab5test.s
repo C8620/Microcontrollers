@@ -26,11 +26,9 @@ INIT_user   LDR     R0, IRQ_Req                 ; Clear IRQ Requests
             LDR     R0, IRQ_Swi                 ; Enable Interrupt for buttons
             MOV     R1, #:11000000
             STRB    R1, [R0]
-            MSR     R1, APSR
-            AND     R1, 
-
-loop
-
+            MRS     R1, APSR                    ; Set I bit of CPSR to low.
+            BIC     R1, R1, #:10000000            
+            MSR     CPSR_c, R1
 fin         B       fin                         ; Infinite loop. Halt.
 
 ; ----------------------------------------------
