@@ -2,7 +2,7 @@
 ;           COMP227 AY2022/23 Exercise 5 Test
 ; Author:   Yang Hu
 ; Uni ID:   10827802
-; Date:     Not yet completed
+; Date:     Monday, 14 March 2023
 ; Email:    yang.hu-6@student.manchester.ac.uk; yanghu22@acm.org
 ; ============================================================================
 
@@ -13,7 +13,7 @@
 
             MOV     R0, R0                      ; Initialise the Supervisor Stack
             B       INIT_user                   ; Head to the initialisation section
-SVC_entry   B       SVC_switch                  ; SVC call
+SVC_entry   B       SVC_entry                   ; SVC call
 pref_abrt   B       pref_abrt                   ; Prefetch abort
 data_abrt   B       data_abrt                   ; Data abort
             MOV     R0, R0                      ;
@@ -26,7 +26,7 @@ INIT_user   LDR     R0, IRQ_Req                 ; Clear IRQ Requests
             LDR     R0, IRQ_Swi                 ; Enable Interrupt for buttons
             MOV     R1, #:11000000
             STRB    R1, [R0]
-            MRS     R1, APSR                    ; Set I bit of CPSR to low.
+            MRS     R1, CPSR                    ; Set I bit of CPSR to low.
             BIC     R1, R1, #:10000000            
             MSR     CPSR_c, R1
 fin         B       fin                         ; Infinite loop. Halt.

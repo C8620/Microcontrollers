@@ -30,6 +30,7 @@ fin         B       fin                         ; Infinite loop. Halt.
 ; System Stack Memory
 stack       DEFS    128
 stack_top   DEFW    0                           ; First unused location od stacks
+timer_mem   DEFW    #&0000_0000                 ; Timer memory.
 
 ; ----------------------------------------------
 ; function SVC_switch: handle SVC calls and invoke actions.
@@ -37,7 +38,7 @@ SVC_switch  PUSH    {LR, R0-R1}                    ; Protect registers - restore
             LDR     R0, [LR, #-4]               ; Load calling SVC instruction.
             LDR     R1, op_remove               ;
             AND     R0, R0, R1                  ; Remove the SVC instruction.
-            CMP     R0, #9                      ; Check if mapping exist.
+            CMP     R0, #6                      ; Check if mapping exist.
             BHI     SVC_default                 ; No mapping - run default.
             ADR     R1, SVC_funcs               ; Load starting point of jump table
             ADR     LR, SVC_exit                ; Load return address- SVC_exit
@@ -50,10 +51,8 @@ SVC_funcs   DEFW    SVC_HALT                    ; SVC 0: Exit, write to halt por
             DEFW    lcd_prints                  ; SVC 2: Print string pointed by R10.
             DEFW    lcd_lights                  ; SVC 3: Trun on the LCD backlight.
             DEFW    lcd_reset                   ; SVC 4: Reset the LCD.
-            DEFW    read_clock                  ; SVC 5: Get clock's value from R0.
-            DEFW    timer_start                 ; SVC 6: Start a timer that occupy R6.
-            DEFW    timer_end                   ; SVC 7: Unset the timer started by SVC 6.
-            DEFW    read_butt                   ; SVC 8: Read values from buttons to R0.
+            DEFW    read_timer                  ; SVC 5: Have timer's count saved to R0.
+            DEFW    timer_arm                   ; SVC 6: Arm the timer, ready to start.
             ALIGN                               ; Prevent anything out of order.
 SVC_default B       SVC_default                 ; No mapping.
 
@@ -63,11 +62,11 @@ SVC_HALT    LDR     R0, HALT_PORT               ; Load address of halt port.
 ; ----------------------------------------------
 ; function IRQ_entry: handle IRQ calls and invoke actions.
 IRQ_entry   PUSH    {LR, R0-R1}                 ; Protect registers - restore on exit.
-            LDR     R0, IRQ_Request             ; Load the IRQ request.
+            LDR     R0, IRQ_Req                 ; Load the IRQ request.
             MOV     R1, #&00000001              ; Load the bit 0.
             AND     R0, R0, R1                  ; Check if bit 0 is High.
             CMP     R0, #&00000001              ; Compare the result.
-            BLEQ    IRQ_clock                   ; If bit 0 is 1, run clock.
+            BLEQ    IRQ_clock                   ; If bit 0 is 1, run clock (Time interrupt).
             MOV     R1, #&01000000              ; Load the bit 6.
             AND     R0, R0, R1                  ; Check if bit 6 is 1.
             CMP     R0, #&01000000              ; Compare the result.
@@ -77,7 +76,7 @@ IRQ_entry   PUSH    {LR, R0-R1}                 ; Protect registers - restore on
             CMP     R0, #&10000000              ; Compare the result.
             BLEQ    IRQ_lbutton                 ; If bit 7 is 1, run lower button.
             POP     {LR, R0-R1}                 ; Restore user memory.
-            MOVS    PC, LR                      ; Exit service mode.    
+            MOVS    PC, LR                      ; Exit service mode.
 
 ; ----------------------------------------------
 ; Static memory pointers used by SVC/IRQ programs.
@@ -251,44 +250,61 @@ bus_off     PUSH    {R9, R11}
             MOV     PC, LR                      ; Return
 
 ; ----------------------------------------------
-; function read_clock: Store timer's value into R0.
-read_clock  PUSH    {R1}                        ; Register protection
-            LDR     R1, clock                   ; Read current timer value
-            LDRB    R0, [R1]                    ;
-            POP     {R1}                        ; Restore register
+; function read_timer: Have timer memory's value loaded to R0.
+read_timer  LDR     R0, timer_mem               ; Have timer mem loaded into R0.
             MOV     PC, LR                      ; Return
+
+; ----------------------------------------------
+; function timer_arm: Prepare the system for a start of counting.
+;                     This function would allow LButton interrupt to occur.
+timer_arm   PUSH    {R1}                        ; Register protection
+            MOV     R1, #0                      ; Reset timer memory to 0.
+            STR     R1, timer_mem               ; Load 0 to timer memory.
+            MRS     R1, CPSR                    ; Set I bit of CPSR to low.
+            BIC     R1, R1, #:10000000          ; Modify I bit.
+            MSR     CPSR_c, R1                  ; Store updated value.
+            LDR     R0, IRQ_Swi                 ; Enable Interrupt for low button
+            LDRB    R1, [R0]                    ; Read current Interrupt switches
+            ORR     R1, R1 #:10000000           ; Enable for Lower Button.
+            STRB    R1, [R0]                    ; Store updated value.
+            POP     {R1}                        ; Register Protection
 
 ; ----------------------------------------------
 ; function timer_start: Set Timer Compare to start timer.
 timer_start PUSH    {R1-R2}                     ; Register protection
             LDR     R1, clock_cmp               ; Load address.
-            MOV     R2, #:00000000              ; Set TC interrupt at end of cycle.
+            MOV     R2, #100                    ; Set TC interrupt at 100ms later.
             STRB    R2, [R1]                    ; Store this value.
-            LDR     R1, IRQ_Swi                 ; Enable Interrupt for TC.
-            LDRB    R2, [R1]                    ; Read current Enable value
-            ORR     R2, R2, #:00000001          ; Enable TC interrupt
-            STRB    R2, [R1]                    ; Store updated Enable value.
             MOV     R2, #:00000000              ; Set current timer value to 0.
             LDR     R1, clock                   ; Load address.
             STRB    R2, [R1]                    ; Store this value.
+            LDR     R1, IRQ_Swi                 ; Enable Interrupt for TC.
+            LDRB    R2, [R1]                    ; Read current Enable value
+            BIC     R2, R2, #:10000000          ; Disable LowButton interrup (this)
+            ORR     R2, R2, #:01000001          ; Enable TC and UpButton interrupt
+            STRB    R2, [R1]                    ; Store updated Enable value.
             POP     {R1-R2}                     ; Restore register.
             MOV     PC, LR                      ; Return
 
 ; ----------------------------------------------
 ; function timer_stop: Set Timer Compare to stop timer.
 timer_stop  PUSH    {R1-R2}                     ; Register protection
-            LDR     R1, IRQ_Swi                 ; Disable Interrupt for TC.
+            LDR     R1, IRQ_Swi                 ; Disable Interrupt for TC:
             LDRB    R2, [R1]                    ; Read current Enable value
-            BIC     R2, R2, #:00000001          ; Disable TC interrupt
+            BIC     R2, R2, #:00000001          ; Set TC interrupt bit to low.
             STRB    R2, [R1]                    ; Store updated Enable value.
-            LDR     R1, clock                   ; Read any extra value.
-            LDRB    R2, [R1]                    ; Read current timer value
-            ADD     R6, R2, R6                  ; Add to total time.
             POP     {R1-R2}                     ; Restore register.
             MOV     PC, LR                      ; Return
 
 ; ----------------------------------------------
-; function read_butt: Read button's pressing state to R0.
+; function timer_reset: If the UButton is pressed for more than 1000ms, reset timer
+timer_reset PUSH    {R1-R2}                     ; Register protection
+
+            POP     {R1-R2}                     ; Register restoration
+            MOV     PC, LR                      ; Return.
+
+; ----------------------------------------------
+; function read_butt: Read button's pressing state to R0. TO BE DELETED!
 read_butt   PUSH    {R1}                        ; Register protection.
             LDR     R1, button                  ; Read data incl. button.
             LDRB    R0, [R1]                    ; Read from memory.
@@ -300,7 +316,19 @@ read_butt   PUSH    {R1}                        ; Register protection.
             ; Upper button on bit 6 (01000000), and
             ; Extra button on but 3 (00001000).
 
-IRQ_clock   ADD     R6, R6, #256                ; Add one cycle to the clock
+; ----------------------------------------------
+; function IRQ_clock: maintain time passed in R6 through TC interrupts.
+IRQ_clock   PUSH    {R1, R2}                    ; Register protection.
+            LDR     R1, timer_mem               ; Load current timer memory.
+            ADD     R1, R1, #100                ; Add 100ms that has passed.
+            STR     R1, timer_mem               ; Store updated value to memory.
+            LDR     R2, clock_cmp               ; Load TC address
+            LDRB    R1, [R2]                    ; Load current TC value.
+            ADD     R1, R1, #100                ; Set TC to 100ms later.
+            CMP     R1, #256                    ; Larger than 256?
+            SUBHI   R1, R1, #256                ; Yes. Must be set in next cycle.
+            STRB    R1, [R2]                    ; Store updated value.
+            POP     {R1, R2}                    ; Register restoration.
             MOV     PC, LR                      ; Return
 
 ; ============================================================================
@@ -308,8 +336,7 @@ IRQ_clock   ADD     R6, R6, #256                ; Add one cycle to the clock
 APPLICATION ADR     SP, usrStackTop             ; Initialise the User Stack
             SVC     4                           ; Reset the LCD unit. Clear everything.
             SVC     3                           ; Light up the LCD unit.
-            ADR     R10, usrStr                 ; Load the address of the user String.
-            SVC     2                           ; Print string.
+            
             SVC     0                           ; Everything. Bye!
 
             CMP     R8, #6                      ; Check if mapping exist.
@@ -324,7 +351,7 @@ stateSwitch DEFW    statePending                ; State 0: Pending, waiting to s
             DEFW    stateReseting               ; State 3: Reseting, reset once 1 second is reached.
             ALIGN                               ; Prevent anything out of order.
 
-usrStr      DB      "Press any button to start", 0
+usrStr      DEFW    "Press any button to start", 0
 
 ; ----------------------------------------------
 ; User Stack Memory
