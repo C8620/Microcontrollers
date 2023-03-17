@@ -1,0 +1,455 @@
+KMD
+00000000:             ; ; ============================================================================
+00000000:             ; ;           COMP227 AY2022/23 Exercise 5
+00000000:             ; ; Author:   Yang Hu
+00000000:             ; ; Uni ID:   10827802
+00000000:             ; ; Date:     Not yet completed
+00000000:             ; ; Email:    yang.hu-6@student.manchester.ac.uk; yanghu22@acm.org
+00000000:             ; ; ============================================================================
+00000000:             ; ; NOTE:     This lab 5 submission is already interrupt-based. This is because
+00000000:             ; ;           When I was asking for some questions, an lecture of interrupt was
+00000000:             ; ;           given and the code was therefore transformed into an interrupt-
+00000000:             ; ;           based code instead of non-interrupt approach.
+00000000:             ; ; ============================================================================
+00000000:             ; 
+00000000:             ; 
+00000000:             ; ; ============================================================================
+00000000:             ; ; SYSTEM INSTRUCTIONS, MEMORY, AND OPERAION HANDLING.
+00000000:             ; 
+00000000: E28FD0B0    ;             ADR     SP, stack_top               ; Initialise the Supervisor Stack
+00000004: EA000005    ;             B       INIT_user                   ; Head to the initialisation section
+00000008: EA00002C    ; SVC_entry   B       SVC_switch                  ; SVC call
+0000000C: EAFFFFFE    ; pref_abrt   B       pref_abrt                   ; Prefetch abort
+00000010: EAFFFFFE    ; data_abrt   B       data_abrt                   ; Data abort
+00000014: E1A00000    ;             MOV     R0, R0                      ;
+00000018: EA0000C9    ;             B       IRQ_entry                   ; Interrupt
+0000001C: EAFFFFFE    ; FIQ_entry   B       FIQ_entry                   ; Fast interrupt
+00000020:             ; 
+00000020: E3A000D0    ; INIT_user   MOV     R0, #&D0                    ; User mode, no ints.
+00000024: E16FF000    ;             MSR     SPSR, R0                    ;
+00000028: E28F0028    ;             ADRL    R0, APPLICATION             ; Load user code address
+0000002C: E2800B01    ; 
+00000030: E1B0F000    ;             MOVS    PC, R0                      ; ‘Return’ to user code
+00000034:             ; 
+00000034: EAFFFFFE    ; fin         B       fin                         ; Infinite loop. Halt.
+00000038:             ; 
+00000038:             ; ; ----------------------------------------------
+00000038:             ; ; System SVP Stack Memory
+00000038:             ; stack       DEFS    128
+000000B8: 00000000    ; stack_top   DEFW    0                           ; First unused location od stacks
+000000BC: 00000000    ; timer_mem   DEFW    &0000_0000                  ; Timer memory.
+000000C0:             ; 
+000000C0:             ; ; ============================================================================
+000000C0:             ; ; SVC CALL HANDLING AND FUNCTIONS. COULD BE USED BY INTERRUPTS.
+000000C0:             ; 
+000000C0:             ; ; ----------------------------------------------
+000000C0:             ; ; function SVC_switch: handle SVC calls and invoke actions.
+000000C0: E92D4003    ; SVC_switch  PUSH    {LR, R0-R1}                    ; Protect registers - restore on exit.
+000000C4: E51E0004    ;             LDR     R0, [LR, #-4]               ; Load calling SVC instruction.
+000000C8: E59F1064    ;             LDR     R1, op_remove               ;
+000000CC: E0000001    ;             AND     R0, R0, R1                  ; Remove the SVC instruction.
+000000D0: E3500006    ;             CMP     R0, #6                      ; Check if mapping exist.
+000000D4: 8A00000B    ;             BHI     SVC_default                 ; No mapping - run default.
+000000D8: E28F100C    ;             ADR     R1, SVC_funcs               ; Load starting point of jump table
+000000DC: E28FE000    ;             ADR     LR, SVC_exit                ; Load return address- SVC_exit
+000000E0: E791F100    ;             LDR     PC, [R1, R0, LSL #2]        ; Load corresponding address.
+000000E4:             ; 
+000000E4: E8BD4003    ; SVC_exit    POP     {LR, R0-R1}                 ; Restore user memory.
+000000E8: E1B0F00E    ;             MOVS    PC, LR                      ; Exit service mode.
+000000EC: 0000010C    ; SVC_funcs   DEFW    SVC_HALT                    ; SVC 0: Exit, write to halt port.
+000000F0: 0000022C    ;             DEFW    lcd_printc                  ; SVC 1: Print character in R10.
+000000F4: 0000020C    ;             DEFW    lcd_prints                  ; SVC 2: Print string pointed by R10.
+000000F8: 00000250    ;             DEFW    lcd_lights                  ; SVC 3: Trun on the LCD backlight.
+000000FC: 00000138    ;             DEFW    lcd_reset                   ; SVC 4: Reset the LCD.
+00000100: 0000030C    ;             DEFW    read_timer                  ; SVC 5: Have timer's count saved to R0.
+00000104: 00000314    ;             DEFW    timer_arm                   ; SVC 6: Arm the timer, ready to start.
+00000108:             ;             ALIGN                               ; Prevent anything out of order.
+00000108: EAFFFFFE    ; SVC_default B       SVC_default                 ; No mapping.
+0000010C:             ; 
+0000010C: E59F001C    ; SVC_HALT    LDR     R0, HALT_PORT               ; Load address of halt port.
+00000110: E5400000    ;             STRB    R0, [R0]                    ; Write to halt port.
+00000114:             ; 
+00000114:             ; ; ----------------------------------------------
+00000114:             ; ; Static memory pointers used by SVC/IRQ programs.
+00000114: 10000000    ; port_a      DEFW    &1000_0000
+00000118: 10000004    ; port_b      DEFW    &1000_0004
+0000011C: 10000004    ; button      DEFW    &1000_0004
+00000120: 10000008    ; clock       DEFW    &1000_0008
+00000124: 1000000C    ; clock_cmp   DEFW    &1000_000C
+00000128: 10000018    ; IRQ_Req     DEFW    &1000_0018
+0000012C: 1000001C    ; IRQ_Swi     DEFW    &1000_001C
+00000130: 10000020    ; HALT_PORT   DEFW    &1000_0020
+00000134:             ; 
+00000134:             ; ; ----------------------------------------------
+00000134:             ; ; Static operations used by SVC/IRQ programs.
+00000134: 00FFFFFF    ; op_remove   DEFW    &00FF_FFFF
+00000138:             ; 
+00000138:             ; ; ----------------------------------------------
+00000138:             ; ; function lcd_reset: reset the display.
+00000138: E92D5E00    ; lcd_reset   PUSH    {LR, R9-R12}                ; Protect registers.
+0000013C: EB00004A    ;             BL      lcd_idle                    ; Wait until LCD is idle
+00000140: E51F9030    ;             LDR     R9, port_b                  ; Read control value memory addr.
+00000144: E559B000    ;             LDRB    R11, [R9]                   ; Load values to R11.
+00000148: E3CBB006    ;             BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+0000014C: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000150: E51FA044    ;             LDR     R10, port_a                 ; Load address for PORT A
+00000154: E3A0C001    ;             MOV     R12, #:00000001             ; Load reset instruction to R12
+00000158: E54AC000    ;             STRB    R12, [R10]                  ; Save instruction to port A
+0000015C: EB00005C    ;             BL      bus_on                      ; Commit changes
+00000160: EB000062    ;             BL      bus_off                     ; Reset state.
+00000164: E8BD9E00    ;             POP     {PC, R9-R12}                ; Restore registers and return.
+00000168:             ; 
+00000168:             ; ; ----------------------------------------------
+00000168:             ; ; function lcd_chglne: Change the cursor to the start the another line of the LCD.
+00000168: E92D5E00    ; lcd_chglne  PUSH    {LR, R9-R12}                ; Protect registers.
+0000016C: EB00003E    ;             BL      lcd_idle                    ; Wait until idle.
+00000170: E51F9060    ;             LDR     R9, port_b                  ; Read control value memory addr.
+00000174: E559B000    ;             LDRB    R11, [R9]                   ; Load values to R11.
+00000178: E3CBB002    ;             BIC     R11, R11, #:00000010        ; Change RS  = 0
+0000017C: E38BB004    ;             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
+00000180: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000184: EB000052    ;             BL      bus_on                      ; Enable Bus
+00000188: E51FA07C    ;             LDR     R10, port_a                 ; Read status byte memory addr.
+0000018C: E55AC000    ;             LDRB    R12, [R10]                  ; Load current status to R12.
+00000190: EB000056    ;             BL      bus_off                     ; Disable Bus.
+00000194: E22CC040    ;             EOR     R12, R12, #:01000000        ; Change line bit.
+00000198: E3CCC0BF    ;             BIC     R12, R12, #:10111111        ; Leave only line bit.
+0000019C: E38CC080    ;             ORR     R12, R12, #:10000000        ; Change first bit as 1.
+000001A0:             ; 
+000001A0: EB000031    ;             BL      lcd_idle                    ; Wait until idle                
+000001A4: E3CBB006    ;             BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+000001A8: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+000001AC: E54AC000    ;             STRB    R12, [R10]                  ; Save instruction to port A
+000001B0: EB000047    ;             BL      bus_on                      ; Commit changes
+000001B4: EB00004D    ;             BL      bus_off                     ; Reset state.
+000001B8: E8BD9E00    ;             POP     {PC, R9-R12}                ; Restore registers and return.
+000001BC:             ; 
+000001BC:             ; ; ----------------------------------------------
+000001BC:             ; ; function lcd_lnehad: put cursor to the start of the current line.
+000001BC: E92D5E00    ; lcd_lnehad  PUSH    {LR, R9-R12}                ; Protect registers
+000001C0: EB000029    ;             BL      lcd_idle                    ; Wait until idle.
+000001C4: E51F90B4    ;             LDR     R9, port_b                  ; Read control values memory addr.
+000001C8: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
+000001CC: E3CBB002    ;             BIC     R11, R11, #:00000010        ; Change RS  = 0
+000001D0: E38BB004    ;             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
+000001D4: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+000001D8: EB00003D    ;             BL      bus_on                      ; Enable Bus
+000001DC: E51FA0D0    ;             LDR     R10, port_a                 ; Read status byte memory addr.
+000001E0: E55AC000    ;             LDRB    R12, [R10]                  ; Read current value to R12.
+000001E4: EB000041    ;             BL      bus_off                     ; Disable bus.
+000001E8: E3CCC0BF    ;             BIC     R12, R12, #:10111111        ; Leave only line bit.
+000001EC: E38CC080    ;             ORR     R12, R12, #:10000000        ; Change first bit as 1.
+000001F0:             ; 
+000001F0: EB00001D    ;             BL      lcd_idle                    ; Wait until idle                
+000001F4: E3CBB006    ;             BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+000001F8: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+000001FC: E54AC000    ;             STRB    R12, [R10]                  ; Save instruction to port A
+00000200: EB000033    ;             BL      bus_on                      ; Commit changes
+00000204: EB000039    ;             BL      bus_off                     ; Reset state.
+00000208: E8BD9E00    ;             POP     {PC, R9-R12}                ; Restore registers and return.
+0000020C:             ; 
+0000020C:             ; ; ----------------------------------------------
+0000020C:             ; ; function lcd_prints:  print a string pointed by R10. R10 is memory location. String must end 
+                      ; with 0.
+0000020C: E92D4C00    ; lcd_prints  PUSH    {LR, R10-R11}               ; Protect registers.
+00000210: E51AB000    ; lcd_p_loop  LDR     R11, [R10]                  ; Load value from R10 address.
+00000214: E35B0000    ;             CMP     R11, #0                     ; Is the string ending?
+00000218: 0A000002    ;             BEQ     lcd_p_exit                  ; Yes, prepare return!
+0000021C: EB000002    ;             BL      lcd_printc                  ; No, print this character.
+00000220: E28AA004    ;             ADD     R10, R10, #4                ; Point R10 to next space.
+00000224: EAFFFFF9    ;             B       lcd_p_loop                  ; Process next character.
+00000228: E8BD4C00    ; lcd_p_exit  POP     {LR, R10-R11}               ; Restore registers and return.
+0000022C:             ; 
+0000022C:             ; ; ----------------------------------------------
+0000022C:             ; ; function lcd_printc:  print a string pointed by R10. R10 is memory location. String must end 
+                      ; with 0.
+0000022C: E92D4400    ; lcd_printc  PUSH    {LR, R10}                   ; Protect registers
+00000230: E35A000D    ;             CMP     R10, #&0D                   ; Carriage Return
+00000234: 028FE010    ;             ADREQ   LR, lcp_pc_end              ; Set end of this function to LR.
+00000238: 0AFFFFCA    ;             BEQ     lcd_chglne                  ; Request a line change.
+0000023C: E35A000A    ;             CMP     R10, #&0A                   ; Newline
+00000240: 028FE004    ;             ADREQ   LR, lcp_pc_end              ; Set end of this function to LR.
+00000244: 0AFFFFC7    ;             BEQ     lcd_chglne                  ; Request a line change.
+00000248: EB000015    ;             BL      lcd_write                   ; Good character, print!
+0000024C: E8BD8400    ; lcp_pc_end  POP     {PC, R10}                   ; Restore registers and return.
+00000250:             ; 
+00000250:             ; ; ----------------------------------------------
+00000250:             ; ; function lcd_lights: turn on the backlight of the LCD
+00000250: E92D0A00    ; lcd_lights  PUSH    {R9, R11}                   ; Protect registers
+00000254: E51F9144    ;             LDR     R9, port_b                  ; Read control values memory addr.
+00000258: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
+0000025C: E38BB020    ;             ORR     R11, R11, #:00100000        ; Set Backlight to High, preserve everything el
+                      ; se.
+00000260: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000264: E8BD0A00    ;             POP     {R9, R11}                   ; Restore registers
+00000268: E1A0F00E    ;             MOV     PC, LR                      ; Return
+0000026C:             ; 
+0000026C:             ; ; ----------------------------------------------
+0000026C:             ; ; function lcd_idle: wait until lcd is not busy.
+0000026C: E92D5A00    ; lcd_idle    PUSH    {LR, R9, R11, R12}          ; Protect registers
+00000270: E51F9160    ;             LDR     R9, port_b                  ; Read control values memory addr.
+00000274: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
+00000278: E3CBB002    ;             BIC     R11, R11, #:00000010        ; Change RS  = 0
+0000027C: E38BB004    ;             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
+00000280: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000284: EB000012    ; lcd_idle_l  BL      bus_on                      ; Enable Bus
+00000288: E51F917C    ;             LDR     R9, port_a                  ; Read status byte memory addr.
+0000028C: E559C000    ;             LDRB    R12, [R9]                   ; Read current value to R12.
+00000290: EB000016    ;             BL      bus_off                     ; Disable Bus
+00000294: E3CCC07F    ;             BIC     R12, R12, #:01111111        ; Get only bit 7 of status byte
+00000298: E35C0080    ;             CMP     R12, #:10000000             ; Is bit 7 of status byte high?
+0000029C: 0AFFFFF8    ;             BEQ     lcd_idle_l                  ; Yes, check again
+000002A0: E8BD9A00    ;             POP     {PC, R9, R11, R12}          ; No, LCD is idle now. Return.
+000002A4:             ;                                                 ; Restore registers and return.                
+000002A4:             ; 
+000002A4:             ; ; ----------------------------------------------
+000002A4:             ; ; function lcd_write: write the character given by R10 to LCD.
+000002A4: E92D4F00    ; lcd_write   PUSH    {LR, R8-R11}                ; Protect registers.
+000002A8: EBFFFFEF    ;             BL      lcd_idle                    ; Step 1-5, wait until idle.
+000002AC: E51F919C    ;             LDR     R9, port_b                  ; Read control values memory addr.
+000002B0: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
+000002B4: E38BB002    ;             ORR     R11, R11, #:00000010        ; Change RS  = 1
+000002B8: E3CBB004    ;             BIC     R11, R11, #:00000100        ; Change R/W = 0 (Write)
+000002BC: E549B000    ;             STRB    R11, [R9]                   ; Write new control byte to Data.
+000002C0: E51F81B4    ;             LDR     R8, port_a                  ; Load data bus memory addr.
+000002C4: E548A000    ;             STRB    R10, [R8]                   ; Write data byte to data bus.
+000002C8: EB000001    ;             BL      bus_on                      ; Enable bus to apply changes.
+000002CC: EB000007    ;             BL      bus_off                     ; Disable bus.
+000002D0: E8BD8F00    ;             POP     {PC, R8-R11}                ; Restore registers and return.
+000002D4:             ; 
+000002D4:             ; ; ----------------------------------------------
+000002D4:             ; ; function bus_on: enable bus
+000002D4: E92D0A00    ; bus_on      PUSH    {R9, R11}                   ; Protect registers.
+000002D8: E51F91C8    ;             LDR     R9, port_b                  ; Load control values memory addr.
+000002DC: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
+000002E0: E38BB001    ;             ORR     R11, R11, #:00000001        ; Set E to High, preserve everything else.
+000002E4: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+000002E8: E8BD0A00    ;             POP     {R9, R11}                   ; Restore registers.
+000002EC: E1A0F00E    ;             MOV     PC, LR                      ; Return
+000002F0:             ; 
+000002F0:             ; ; ----------------------------------------------
+000002F0:             ; ; function bus_off: disable bus
+000002F0: E92D0A00    ; bus_off     PUSH    {R9, R11}                   ; Protect registers
+000002F4: E51F91E4    ;             LDR     R9, port_b                  ; Load control values memory addr.
+000002F8: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
+000002FC: E3CBB001    ;             BIC     R11, R11, #:00000001        ; Set E to Low, preserve everything else.
+00000300: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
+00000304: E8BD0A00    ;             POP     {R9, R11}                   ; Restore registers.
+00000308: E1A0F00E    ;             MOV     PC, LR                      ; Return
+0000030C:             ; 
+0000030C:             ; ; ----------------------------------------------
+0000030C:             ; ; function read_timer: Have timer memory's value loaded to R0.
+0000030C: E51F0258    ; read_timer  LDR     R0, timer_mem               ; Have timer mem loaded into R0.
+00000310: E1A0F00E    ;             MOV     PC, LR                      ; Return
+00000314:             ; 
+00000314:             ; ; ----------------------------------------------
+00000314:             ; ; function timer_arm: Prepare the system for a start of counting.
+00000314:             ; ;                     This function would allow LButton interrupt to occur.
+00000314: E92D0003    ; timer_arm   PUSH    {R0-R1}                     ; Register protection
+00000318: E3A01000    ;             MOV     R1, #0                      ; Reset timer memory to 0.
+0000031C: E50F1268    ;             STR     R1, timer_mem               ; Load 0 to timer memory.
+00000320: E14F1000    ;             MRS     R1, SPSR                    ; Set I bit of SPSR to low.
+00000324: E3C11080    ;             BIC     R1, R1, #:10000000          ; Modify I bit.
+00000328: E161F001    ;             MSR     SPSR_c, R1                  ; Store updated value.
+0000032C: E51F0208    ;             LDR     R0, IRQ_Swi                 ; Enable Interrupt for low button
+00000330: E5501000    ;             LDRB    R1, [R0]                    ; Read current Interrupt switches
+00000334: E3811080    ;             ORR     R1, R1, #:10000000          ; Enable for Lower Button.
+00000338: E5401000    ;             STRB    R1, [R0]                    ; Store updated value.
+0000033C: E8BD0003    ;             POP     {R0-R1}                     ; Register Protection
+00000340: E1A0F00E    ;             MOV     PC, LR                      ; Return
+00000344:             ; 
+00000344:             ; ; ============================================================================
+00000344:             ; ; INTERRUPT HANDLING AND FUNCTIONS
+00000344:             ; 
+00000344:             ; ; ----------------------------------------------
+00000344:             ; ; function IRQ_entry: handle IRQ calls and invoke actions.
+00000344: E24FDFA5    ; IRQ_entry   ADR     SP, stack_top               ; Initialise the Interrupt Stack
+00000348: E92D400F    ;             PUSH    {LR, R0-R3}                 ; Protect registers - restore on exit.
+0000034C: E51F322C    ;             LDR     R3, IRQ_Req                 ; Load the IRQ request's memory addr.
+00000350: E5530000    ;             LDRB    R0, [R3]                    ; Load IRQ Request data
+00000354: E3C010FE    ;             BIC     R1, R0, #:11111110          ; Leave only bit 0
+00000358: E3510000    ;             CMP     R1, #:00000000              ; Compare the result.
+0000035C: 1B000031    ;             BLNE    IRQ_clock                   ; If bit 0 is 1, run clock (Time interrupt).
+00000360: E3C010BF    ;             BIC     R1, R0, #:10111111          ; Leave only bit 6
+00000364: E3510000    ;             CMP     R1, #:00000000              ; Compare the result.
+00000368: 1B00000F    ;             BLNE    timer_start                 ; If bit 6 is 1, run LOWER button.
+0000036C: E3C0107F    ;             BIC     R1, R0, #:01111111          ; Leave only bit 7
+00000370: E3510000    ;             CMP     R1, #:00000000              ; Compare the result.
+00000374: 1B000003    ;             BLNE    IRQ_ubutoon                 ; If bit 7 is 1, run UPPER button.
+00000378: E3C000C1    ;             BIC     R0, R0, #:11000001          ; Clear bit 0, 6, and 7.
+0000037C: E5430000    ;             STRB    R0, [R3]                    ; Store new interrupt requests.
+00000380: E8BD400F    ;             POP     {LR, R0-R3}                 ; Restore registers.
+00000384: E1B0F00E    ;             MOVS    PC, LR                      ; Return.
+00000388:             ; 
+00000388:             ; ; ----------------------------------------------
+00000388:             ; ; function IRQ_ubutoon: Handle interrupt request led by upper button.
+00000388: E92D4001    ; IRQ_ubutoon PUSH    {LR, R0}                    ; Protect registers.
+0000038C: E51F0268    ;             LDR     R0, IRQ_Swi                 ; Load IRQ switches address.
+00000390: E5500000    ;             LDRB    R0, [R0]                    ; Load IRQ switches values.
+00000394: E3C000FE    ;             BIC     R0, R0, #:11111110          ; Leave only bit 0.
+00000398: E59FE008    ;             LDR     LR, IRQ_ubtn_e              ; Set return address.
+0000039C: E3500001    ;             CMP     R0, #:00000001              ; If time interrupt is HIGH?
+000003A0: 0A00000F    ;             BEQ     timer_stop                  ; Yes, stop timer.
+000003A4: 1A000016    ;             BNE     timer_reset                 ; No, possible reset!
+000003A8: E8BD8001    ; IRQ_ubtn_e  POP     {PC, R0}                    ; Restore registers and return.
+000003AC:             ; 
+000003AC:             ; 
+000003AC:             ; ; ----------------------------------------------
+000003AC:             ; ; function timer_start: Set Timer Compare to start timer.
+000003AC: E92D0006    ; timer_start PUSH    {R1-R2}                     ; Register protection
+000003B0: E51F1294    ;             LDR     R1, clock_cmp               ; Load address.
+000003B4: E3A02064    ;             MOV     R2, #100                    ; Set TC interrupt at 100ms later.
+000003B8: E5412000    ;             STRB    R2, [R1]                    ; Store this value.
+000003BC: E3A02000    ;             MOV     R2, #:00000000              ; Set current timer value to 0.
+000003C0: E51F12A8    ;             LDR     R1, clock                   ; Load address.
+000003C4: E5412000    ;             STRB    R2, [R1]                    ; Store this value.
+000003C8: E51F12A4    ;             LDR     R1, IRQ_Swi                 ; Enable Interrupt for TC.
+000003CC: E5512000    ;             LDRB    R2, [R1]                    ; Read current Enable value
+000003D0: E3C22080    ;             BIC     R2, R2, #:10000000          ; Disable LowButton interrup (this)
+000003D4: E3822041    ;             ORR     R2, R2, #:01000001          ; Enable TC and UpButton interrupt
+000003D8: E5412000    ;             STRB    R2, [R1]                    ; Store updated Enable value.
+000003DC: E8BD0006    ;             POP     {R1-R2}                     ; Restore register.
+000003E0: E1A0F00E    ;             MOV     PC, LR                      ; Return
+000003E4:             ; 
+000003E4:             ; ; ----------------------------------------------
+000003E4:             ; ; function timer_stop: Set Timer Compare to stop timer.
+000003E4: E92D0006    ; timer_stop  PUSH    {R1-R2}                     ; Register protection
+000003E8: E51F12C4    ;             LDR     R1, IRQ_Swi                 ; Disable Interrupt for TC:
+000003EC: E5512000    ;             LDRB    R2, [R1]                    ; Read current Enable value
+000003F0: E3C22001    ;             BIC     R2, R2, #:00000001          ; Set TC interrupt bit to low.
+000003F4: E3822080    ;             ORR     R2, R2, #:10000000          ; Enable LowButton interrupt (resume).
+000003F8: E5412000    ;             STRB    R2, [R1]                    ; Store updated Enable value.
+000003FC: E8BD0006    ;             POP     {R1-R2}                     ; Restore register.
+00000400: E1A0F00E    ;             MOV     PC, LR                      ; Return
+00000404:             ; 
+00000404:             ; ; ----------------------------------------------
+00000404:             ; ; function timer_reset: If the UButton is pressed for more than 1000ms, reset timer
+00000404: E92D0006    ; timer_reset PUSH    {R1-R2}                     ; Register protection
+00000408:             ; 
+00000408: E8BD0006    ;             POP     {R1-R2}                     ; Register restoration
+0000040C: E1A0F00E    ;             MOV     PC, LR                      ; Return.
+00000410:             ; 
+00000410:             ; ; ----------------------------------------------
+00000410:             ; ; function read_butt: Read button's pressing state to R0. TO BE DELETED!
+00000410: E92D0002    ; read_butt   PUSH    {R1}                        ; Register protection.
+00000414: E51F1300    ;             LDR     R1, button                  ; Read data incl. button.
+00000418: E5510000    ;             LDRB    R0, [R1]                    ; Read from memory.
+0000041C: E3C00037    ;             BIC     R0, R0, #:00110111          ; Filter out unneeded data.
+00000420: E8BD0002    ;             POP     {R1}                        ; Restore register
+00000424: E1A0F00E    ;             MOV     PC, LR                      ; Return.
+00000428:             ;             ; Note on button mapping:
+00000428:             ;             ; Lower button on bit 7 (10000000),
+00000428:             ;             ; Upper button on bit 6 (01000000), and
+00000428:             ;             ; Extra button on but 3 (00001000).
+00000428:             ; 
+00000428:             ; ; ----------------------------------------------
+00000428:             ; ; function IRQ_clock: maintain time passed in R6 through TC interrupts.
+00000428: E92D0006    ; IRQ_clock   PUSH    {R1, R2}                    ; Register protection.
+0000042C: E51F1378    ;             LDR     R1, timer_mem               ; Load current timer memory.
+00000430: E2811064    ;             ADD     R1, R1, #100                ; Add 100ms that has passed.
+00000434: E50F1380    ;             STR     R1, timer_mem               ; Store updated value to memory.
+00000438: E51F231C    ;             LDR     R2, clock_cmp               ; Load TC address
+0000043C: E5521000    ;             LDRB    R1, [R2]                    ; Load current TC value.
+00000440: E2811064    ;             ADD     R1, R1, #100                ; Set TC to 100ms later.
+00000444: E3510C01    ;             CMP     R1, #256                    ; Larger than 256?
+00000448: 82411C01    ;             SUBHI   R1, R1, #256                ; Yes. Must be set in next cycle.
+0000044C: E5421000    ;             STRB    R1, [R2]                    ; Store updated value.
+00000450: E8BD0006    ;             POP     {R1, R2}                    ; Register restoration.
+00000454: E1A0F00E    ;             MOV     PC, LR                      ; Return
+00000458:             ; 
+00000458:             ; ; ============================================================================
+00000458:             ; ; USER INSTRUCION, MEMORY, AND PROGRAMS.
+00000458: E28FD09C    ; APPLICATION ADR     SP, usrStackTop             ; Initialise the User Stack
+0000045C: EF000006    ;             SVC     6                           ; Arm timer.
+00000460: EAFFFFFE    ; inf_loop    B       inf_loop                    ; Let interrupts do the rest!
+00000464: EAFFFFFD    ;             B       inf_loop                    ; Interrupt would return to here!
+00000468: EF000000    ;             SVC     0                           ; Everything. Bye!
+0000046C: EF000004    ;             SVC     4                           ; Reset the LCD unit. Clear everything.
+00000470: EF000003    ;             SVC     3                           ; Light up the LCD unit.
+00000474:             ; 
+00000474: 00000050    ; usrStr      DEFW    "Press any button to start", 0
+00000478: 00000072    ; 
+0000047C: 00000065    ; 
+00000480: 00000073    ; 
+00000484: 00000073    ; 
+00000488: 00000020    ; 
+0000048C: 00000061    ; 
+00000490: 0000006E    ; 
+00000494: 00000079    ; 
+00000498: 00000020    ; 
+0000049C: 00000062    ; 
+000004A0: 00000075    ; 
+000004A4: 00000074    ; 
+000004A8: 00000074    ; 
+000004AC: 0000006F    ; 
+000004B0: 0000006E    ; 
+000004B4: 00000020    ; 
+000004B8: 00000074    ; 
+000004BC: 0000006F    ; 
+000004C0: 00000020    ; 
+000004C4: 00000073    ; 
+000004C8: 00000074    ; 
+000004CC: 00000061    ; 
+000004D0: 00000072    ; 
+000004D4: 00000074    ; 
+000004D8: 00000000    ; 
+000004DC:             ; 
+000004DC:             ; ; ----------------------------------------------
+000004DC:             ; ; User Stack Memory
+000004DC:             ; usrStack    DEFS    32
+000004FC: 00000000    ; usrStackTop DEFW    0                           ; First unused location od stack
+00000500:             ; 
+
+Symbol Table: Labels
+: SVC_entry                         00000008  Local -- ARM
+: pref_abrt                         0000000C  Local -- ARM
+: data_abrt                         00000010  Local -- ARM
+: FIQ_entry                         0000001C  Local -- ARM
+: INIT_user                         00000020  Local -- ARM
+: fin                               00000034  Local -- ARM
+: stack                             00000038  Local -- ARM
+: stack_top                         000000B8  Local -- ARM
+: timer_mem                         000000BC  Local -- ARM
+: SVC_switch                        000000C0  Local -- ARM
+: SVC_exit                          000000E4  Local -- ARM
+: SVC_funcs                         000000EC  Local -- ARM
+: SVC_default                       00000108  Local -- ARM
+: SVC_HALT                          0000010C  Local -- ARM
+: port_a                            00000114  Local -- ARM
+: port_b                            00000118  Local -- ARM
+: button                            0000011C  Local -- ARM
+: clock                             00000120  Local -- ARM
+: clock_cmp                         00000124  Local -- ARM
+: IRQ_Req                           00000128  Local -- ARM
+: IRQ_Swi                           0000012C  Local -- ARM
+: HALT_PORT                         00000130  Local -- ARM
+: op_remove                         00000134  Local -- ARM
+: lcd_reset                         00000138  Local -- ARM
+: lcd_chglne                        00000168  Local -- ARM
+: lcd_lnehad                        000001BC  Local -- ARM
+: lcd_prints                        0000020C  Local -- ARM
+: lcd_p_loop                        00000210  Local -- ARM
+: lcd_p_exit                        00000228  Local -- ARM
+: lcd_printc                        0000022C  Local -- ARM
+: lcp_pc_end                        0000024C  Local -- ARM
+: lcd_lights                        00000250  Local -- ARM
+: lcd_idle                          0000026C  Local -- ARM
+: lcd_idle_l                        00000284  Local -- ARM
+: lcd_write                         000002A4  Local -- ARM
+: bus_on                            000002D4  Local -- ARM
+: bus_off                           000002F0  Local -- ARM
+: read_timer                        0000030C  Local -- ARM
+: timer_arm                         00000314  Local -- ARM
+: IRQ_entry                         00000344  Local -- ARM
+: IRQ_ubutoon                       00000388  Local -- ARM
+: IRQ_ubtn_e                        000003A8  Local -- ARM
+: timer_start                       000003AC  Local -- ARM
+: timer_stop                        000003E4  Local -- ARM
+: timer_reset                       00000404  Local -- ARM
+: read_butt                         00000410  Local -- ARM
+: IRQ_clock                         00000428  Local -- ARM
+: APPLICATION                       00000458  Local -- ARM
+: inf_loop                          00000460  Local -- ARM
+: usrStr                            00000474  Local -- ARM
+: usrStack                          000004DC  Local -- ARM
+: usrStackTop                       000004FC  Local -- ARM

@@ -1,14 +1,9 @@
 ; ============================================================================
-;           COMP227 AY2022/23 Exercise 5
+;           COMP227 AY2022/23 Exercise 4 BIC VERIFICATION
 ; Author:   Yang Hu
 ; Uni ID:   10827802
 ; Date:     Not yet completed
 ; Email:    yang.hu-6@student.manchester.ac.uk; yanghu22@acm.org
-; ============================================================================
-; NOTE:     This lab 5 submission is already interrupt-based. This is because
-;           When I was asking for some questions, an lecture of interrupt was
-;           given and the code was therefore transformed into an interrupt-
-;           based code instead of non-interrupt approach.
 ; ============================================================================
 
 
@@ -355,14 +350,14 @@ IRQ_clock   PUSH    {R1, R2}                    ; Register protection.
 ; ============================================================================
 ; USER INSTRUCION, MEMORY, AND PROGRAMS.
 APPLICATION ADR     SP, usrStackTop             ; Initialise the User Stack
-            SVC     6                           ; Arm timer.
-inf_loop    B       inf_loop                    ; Let interrupts do the rest!
-            B       inf_loop                    ; Interrupt would return to here!
-            SVC     0                           ; Everything. Bye!
             SVC     4                           ; Reset the LCD unit. Clear everything.
             SVC     3                           ; Light up the LCD unit.
+            ADR     R10, usrStr                 ; Load the address of the user String.
+            SVC     2                           ; Print string.
+            SVC     0                           ; Everything. Bye!
 
-usrStr      DEFW    "Press any button to start", 0
+; ----------------------------------------------
+usrStr      DEFW    "C86.ac.cn\nHachiroku.uk", 0
 
 ; ----------------------------------------------
 ; User Stack Memory
