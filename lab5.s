@@ -88,7 +88,7 @@ lcd_reset   PUSH    {LR, R9-R12}                ; Protect registers.
             BL      lcd_idle                    ; Wait until LCD is idle
             LDR     R9, port_b                  ; Read control value memory addr.
             LDRB    R11, [R9]                   ; Load values to R11.
-            BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+            AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
             STRB    R11, [R9]                   ; Write new control values
             LDR     R10, port_a                 ; Load address for PORT A
             MOV     R12, #:00000001             ; Load reset instruction to R12
@@ -103,7 +103,7 @@ lcd_chglne  PUSH    {LR, R9-R12}                ; Protect registers.
             BL      lcd_idle                    ; Wait until idle.
             LDR     R9, port_b                  ; Read control value memory addr.
             LDRB    R11, [R9]                   ; Load values to R11.
-            BIC     R11, R11, #:00000010        ; Change RS  = 0
+            AND     R11, R11, #:11111101        ; Change RS  = 0
             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
             STRB    R11, [R9]                   ; Write new control values
             BL      bus_on                      ; Enable Bus
@@ -111,11 +111,11 @@ lcd_chglne  PUSH    {LR, R9-R12}                ; Protect registers.
             LDRB    R12, [R10]                  ; Load current status to R12.
             BL      bus_off                     ; Disable Bus.
             EOR     R12, R12, #:01000000        ; Change line bit.
-            BIC     R12, R12, #:10111111        ; Leave only line bit.
+            AND     R12, R12, #:01000000        ; Leave only line bit.
             ORR     R12, R12, #:10000000        ; Change first bit as 1.
 
             BL      lcd_idle                    ; Wait until idle                
-            BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+            AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
             STRB    R11, [R9]                   ; Write new control values
             STRB    R12, [R10]                  ; Save instruction to port A
             BL      bus_on                      ; Commit changes
@@ -128,18 +128,18 @@ lcd_lnehad  PUSH    {LR, R9-R12}                ; Protect registers
             BL      lcd_idle                    ; Wait until idle.
             LDR     R9, port_b                  ; Read control values memory addr.
             LDRB    R11, [R9]                   ; Read current values to R11.
-            BIC     R11, R11, #:00000010        ; Change RS  = 0
+            AND     R11, R11, #:11111110        ; Change RS  = 0
             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
             STRB    R11, [R9]                   ; Write new control values
             BL      bus_on                      ; Enable Bus
             LDR     R10, port_a                 ; Read status byte memory addr.
             LDRB    R12, [R10]                  ; Read current value to R12.
             BL      bus_off                     ; Disable bus.
-            BIC     R12, R12, #:10111111        ; Leave only line bit.
+            AND     R12, R12, #:01000000        ; Leave only line bit.
             ORR     R12, R12, #:10000000        ; Change first bit as 1.
 
             BL      lcd_idle                    ; Wait until idle                
-            BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+            AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
             STRB    R11, [R9]                   ; Write new control values
             STRB    R12, [R10]                  ; Save instruction to port A
             BL      bus_on                      ; Commit changes
@@ -184,14 +184,14 @@ lcd_lights  PUSH    {R9, R11}                   ; Protect registers
 lcd_idle    PUSH    {LR, R9, R11, R12}          ; Protect registers
             LDR     R9, port_b                  ; Read control values memory addr.
             LDRB    R11, [R9]                   ; Read current values to R11.
-            BIC     R11, R11, #:00000010        ; Change RS  = 0
+            AND     R11, R11, #:11111101        ; Change RS  = 0
             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
             STRB    R11, [R9]                   ; Write new control values
 lcd_idle_l  BL      bus_on                      ; Enable Bus
             LDR     R9, port_a                  ; Read status byte memory addr.
             LDRB    R12, [R9]                   ; Read current value to R12.
             BL      bus_off                     ; Disable Bus
-            BIC     R12, R12, #:01111111        ; Get only bit 7 of status byte
+            AND     R12, R12, #:10000000        ; Get only bit 7 of status byte
             CMP     R12, #:10000000             ; Is bit 7 of status byte high?
             BEQ     lcd_idle_l                  ; Yes, check again
             POP     {PC, R9, R11, R12}          ; No, LCD is idle now. Return.
@@ -204,7 +204,7 @@ lcd_write   PUSH    {LR, R8-R11}                ; Protect registers.
             LDR     R9, port_b                  ; Read control values memory addr.
             LDRB    R11, [R9]                   ; Read current values to R11.
             ORR     R11, R11, #:00000010        ; Change RS  = 1
-            BIC     R11, R11, #:00000100        ; Change R/W = 0 (Write)
+            AND     R11, R11, #:11111011        ; Change R/W = 0 (Write)
             STRB    R11, [R9]                   ; Write new control byte to Data.
             LDR     R8, port_a                  ; Load data bus memory addr.
             STRB    R10, [R8]                   ; Write data byte to data bus.
@@ -227,7 +227,7 @@ bus_on      PUSH    {R9, R11}                   ; Protect registers.
 bus_off     PUSH    {R9, R11}                   ; Protect registers
             LDR     R9, port_b                  ; Load control values memory addr.
             LDRB    R11, [R9]                   ; Read current values to R11.
-            BIC     R11, R11, #:00000001        ; Set E to Low, preserve everything else.
+            AND     R11, R11, #:11111110        ; Set E to Low, preserve everything else.
             STRB    R11, [R9]                   ; Write new control values
             POP     {R9, R11}                   ; Restore registers.
             MOV     PC, LR                      ; Return
@@ -244,7 +244,7 @@ timer_arm   PUSH    {R0-R1}                     ; Register protection
             MOV     R1, #0                      ; Reset timer memory to 0.
             STR     R1, timer_mem               ; Load 0 to timer memory.
             MRS     R1, SPSR                    ; Set I bit of SPSR to low.
-            BIC     R1, R1, #:10000000          ; Modify I bit.
+            AND     R1, R1, #:01111111          ; Modify I bit to LOW.
             MSR     SPSR_c, R1                  ; Store updated value.
             LDR     R0, IRQ_Swi                 ; Enable Interrupt for low button
             LDRB    R1, [R0]                    ; Read current Interrupt switches
@@ -262,16 +262,16 @@ IRQ_entry   ADR     SP, stack_top               ; Initialise the Interrupt Stack
             PUSH    {LR, R0-R3}                 ; Protect registers - restore on exit.
             LDR     R3, IRQ_Req                 ; Load the IRQ request's memory addr.
             LDRB    R0, [R3]                    ; Load IRQ Request data
-            BIC     R1, R0, #:11111110          ; Leave only bit 0
+            AND     R1, R0, #:00000001          ; Leave only bit 0
             CMP     R1, #:00000000              ; Compare the result.
             BLNE    IRQ_clock                   ; If bit 0 is 1, run clock (Time interrupt).
-            BIC     R1, R0, #:10111111          ; Leave only bit 6
+            AND     R1, R0, #:01000000          ; Leave only bit 6
             CMP     R1, #:00000000              ; Compare the result.
-            BLNE    timer_start                 ; If bit 6 is 1, run LOWER button.
-            BIC     R1, R0, #:01111111          ; Leave only bit 7
+            BLNE    IRQ_ubutoon                 ; If bit 6 is 1, run UPPER button.
+            AND     R1, R0, #:00100000          ; Leave only bit 5
             CMP     R1, #:00000000              ; Compare the result.
-            BLNE    IRQ_ubutoon                 ; If bit 7 is 1, run UPPER button.
-            BIC     R0, R0, #:11000001          ; Clear bit 0, 6, and 7.
+            BLNE    timer_start                 ; If bit 5 is 1, run LOWER button.
+            AND     R0, R0, #:00111110          ; Clear bit 0, 6, and 7.
             STRB    R0, [R3]                    ; Store new interrupt requests.
             POP     {LR, R0-R3}                 ; Restore registers.
             MOVS    PC, LR                      ; Return.
@@ -281,7 +281,7 @@ IRQ_entry   ADR     SP, stack_top               ; Initialise the Interrupt Stack
 IRQ_ubutoon PUSH    {LR, R0}                    ; Protect registers.
             LDR     R0, IRQ_Swi                 ; Load IRQ switches address.
             LDRB    R0, [R0]                    ; Load IRQ switches values.
-            BIC     R0, R0, #:11111110          ; Leave only bit 0.
+            AND     R0, R0, #:00000001          ; Leave only bit 0.
             LDR     LR, IRQ_ubtn_e              ; Set return address.
             CMP     R0, #:00000001              ; If time interrupt is HIGH?
             BEQ     timer_stop                  ; Yes, stop timer.
@@ -300,7 +300,7 @@ timer_start PUSH    {R1-R2}                     ; Register protection
             STRB    R2, [R1]                    ; Store this value.
             LDR     R1, IRQ_Swi                 ; Enable Interrupt for TC.
             LDRB    R2, [R1]                    ; Read current Enable value
-            BIC     R2, R2, #:10000000          ; Disable LowButton interrup (this)
+            AND     R2, R2, #:01111111          ; Disable LowButton interrup (this)
             ORR     R2, R2, #:01000001          ; Enable TC and UpButton interrupt
             STRB    R2, [R1]                    ; Store updated Enable value.
             POP     {R1-R2}                     ; Restore register.
@@ -311,7 +311,7 @@ timer_start PUSH    {R1-R2}                     ; Register protection
 timer_stop  PUSH    {R1-R2}                     ; Register protection
             LDR     R1, IRQ_Swi                 ; Disable Interrupt for TC:
             LDRB    R2, [R1]                    ; Read current Enable value
-            BIC     R2, R2, #:00000001          ; Set TC interrupt bit to low.
+            AND     R2, R2, #:11111110          ; Set TC interrupt bit to low.
             ORR     R2, R2, #:10000000          ; Enable LowButton interrupt (resume).
             STRB    R2, [R1]                    ; Store updated Enable value.
             POP     {R1-R2}                     ; Restore register.
@@ -329,7 +329,7 @@ timer_reset PUSH    {R1-R2}                     ; Register protection
 read_butt   PUSH    {R1}                        ; Register protection.
             LDR     R1, button                  ; Read data incl. button.
             LDRB    R0, [R1]                    ; Read from memory.
-            BIC     R0, R0, #:00110111          ; Filter out unneeded data.
+            AND     R0, R0, #:11001000          ; Filter out unneeded data.
             POP     {R1}                        ; Restore register
             MOV     PC, LR                      ; Return.
             ; Note on button mapping:
@@ -341,7 +341,7 @@ read_butt   PUSH    {R1}                        ; Register protection.
 ; function IRQ_clock: maintain time passed in R6 through TC interrupts.
 IRQ_clock   PUSH    {R1, R2}                    ; Register protection.
             LDR     R1, timer_mem               ; Load current timer memory.
-            ADD     R1, R1, #100                ; Add 100ms that has passed.
+            ADD     R1, R1, #1                  ; Add 100ms that has passed.
             STR     R1, timer_mem               ; Store updated value to memory.
             LDR     R2, clock_cmp               ; Load TC address
             LDRB    R1, [R2]                    ; Load current TC value.
@@ -367,4 +367,4 @@ usrStr      DEFW    "Press any button to start", 0
 ; ----------------------------------------------
 ; User Stack Memory
 usrStack    DEFS    32
-usrStackTop DEFW    0                           ; First unused location od stack
+usrStackTop DEFW    0                           ; First unused location on stack

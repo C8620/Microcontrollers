@@ -90,7 +90,7 @@ KMD
 0000013C: EB00004A    ;             BL      lcd_idle                    ; Wait until LCD is idle
 00000140: E51F9030    ;             LDR     R9, port_b                  ; Read control value memory addr.
 00000144: E559B000    ;             LDRB    R11, [R9]                   ; Load values to R11.
-00000148: E3CBB006    ;             BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+00000148: E20BB0F9    ;             AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
 0000014C: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
 00000150: E51FA044    ;             LDR     R10, port_a                 ; Load address for PORT A
 00000154: E3A0C001    ;             MOV     R12, #:00000001             ; Load reset instruction to R12
@@ -105,7 +105,7 @@ KMD
 0000016C: EB00003E    ;             BL      lcd_idle                    ; Wait until idle.
 00000170: E51F9060    ;             LDR     R9, port_b                  ; Read control value memory addr.
 00000174: E559B000    ;             LDRB    R11, [R9]                   ; Load values to R11.
-00000178: E3CBB002    ;             BIC     R11, R11, #:00000010        ; Change RS  = 0
+00000178: E20BB0FD    ;             AND     R11, R11, #:11111101        ; Change RS  = 0
 0000017C: E38BB004    ;             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
 00000180: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
 00000184: EB000052    ;             BL      bus_on                      ; Enable Bus
@@ -113,11 +113,11 @@ KMD
 0000018C: E55AC000    ;             LDRB    R12, [R10]                  ; Load current status to R12.
 00000190: EB000056    ;             BL      bus_off                     ; Disable Bus.
 00000194: E22CC040    ;             EOR     R12, R12, #:01000000        ; Change line bit.
-00000198: E3CCC0BF    ;             BIC     R12, R12, #:10111111        ; Leave only line bit.
+00000198: E20CC040    ;             AND     R12, R12, #:01000000        ; Leave only line bit.
 0000019C: E38CC080    ;             ORR     R12, R12, #:10000000        ; Change first bit as 1.
 000001A0:             ; 
 000001A0: EB000031    ;             BL      lcd_idle                    ; Wait until idle                
-000001A4: E3CBB006    ;             BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+000001A4: E20BB0F9    ;             AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
 000001A8: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
 000001AC: E54AC000    ;             STRB    R12, [R10]                  ; Save instruction to port A
 000001B0: EB000047    ;             BL      bus_on                      ; Commit changes
@@ -130,18 +130,18 @@ KMD
 000001C0: EB000029    ;             BL      lcd_idle                    ; Wait until idle.
 000001C4: E51F90B4    ;             LDR     R9, port_b                  ; Read control values memory addr.
 000001C8: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
-000001CC: E3CBB002    ;             BIC     R11, R11, #:00000010        ; Change RS  = 0
+000001CC: E20BB0FE    ;             AND     R11, R11, #:11111110        ; Change RS  = 0
 000001D0: E38BB004    ;             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
 000001D4: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
 000001D8: EB00003D    ;             BL      bus_on                      ; Enable Bus
 000001DC: E51FA0D0    ;             LDR     R10, port_a                 ; Read status byte memory addr.
 000001E0: E55AC000    ;             LDRB    R12, [R10]                  ; Read current value to R12.
 000001E4: EB000041    ;             BL      bus_off                     ; Disable bus.
-000001E8: E3CCC0BF    ;             BIC     R12, R12, #:10111111        ; Leave only line bit.
+000001E8: E20CC040    ;             AND     R12, R12, #:01000000        ; Leave only line bit.
 000001EC: E38CC080    ;             ORR     R12, R12, #:10000000        ; Change first bit as 1.
 000001F0:             ; 
 000001F0: EB00001D    ;             BL      lcd_idle                    ; Wait until idle                
-000001F4: E3CBB006    ;             BIC     R11, R11, #:00000110        ; Change RS = 0, R/W = 0 (Write)
+000001F4: E20BB0F9    ;             AND     R11, R11, #:11111001        ; Change RS = 0, R/W = 0 (Write)
 000001F8: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
 000001FC: E54AC000    ;             STRB    R12, [R10]                  ; Save instruction to port A
 00000200: EB000033    ;             BL      bus_on                      ; Commit changes
@@ -189,14 +189,14 @@ KMD
 0000026C: E92D5A00    ; lcd_idle    PUSH    {LR, R9, R11, R12}          ; Protect registers
 00000270: E51F9160    ;             LDR     R9, port_b                  ; Read control values memory addr.
 00000274: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
-00000278: E3CBB002    ;             BIC     R11, R11, #:00000010        ; Change RS  = 0
+00000278: E20BB0FD    ;             AND     R11, R11, #:11111101        ; Change RS  = 0
 0000027C: E38BB004    ;             ORR     R11, R11, #:00000100        ; Change R/W = 1 (Read)
 00000280: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
 00000284: EB000012    ; lcd_idle_l  BL      bus_on                      ; Enable Bus
 00000288: E51F917C    ;             LDR     R9, port_a                  ; Read status byte memory addr.
 0000028C: E559C000    ;             LDRB    R12, [R9]                   ; Read current value to R12.
 00000290: EB000016    ;             BL      bus_off                     ; Disable Bus
-00000294: E3CCC07F    ;             BIC     R12, R12, #:01111111        ; Get only bit 7 of status byte
+00000294: E20CC080    ;             AND     R12, R12, #:10000000        ; Get only bit 7 of status byte
 00000298: E35C0080    ;             CMP     R12, #:10000000             ; Is bit 7 of status byte high?
 0000029C: 0AFFFFF8    ;             BEQ     lcd_idle_l                  ; Yes, check again
 000002A0: E8BD9A00    ;             POP     {PC, R9, R11, R12}          ; No, LCD is idle now. Return.
@@ -209,7 +209,7 @@ KMD
 000002AC: E51F919C    ;             LDR     R9, port_b                  ; Read control values memory addr.
 000002B0: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
 000002B4: E38BB002    ;             ORR     R11, R11, #:00000010        ; Change RS  = 1
-000002B8: E3CBB004    ;             BIC     R11, R11, #:00000100        ; Change R/W = 0 (Write)
+000002B8: E20BB0FB    ;             AND     R11, R11, #:11111011        ; Change R/W = 0 (Write)
 000002BC: E549B000    ;             STRB    R11, [R9]                   ; Write new control byte to Data.
 000002C0: E51F81B4    ;             LDR     R8, port_a                  ; Load data bus memory addr.
 000002C4: E548A000    ;             STRB    R10, [R8]                   ; Write data byte to data bus.
@@ -232,7 +232,7 @@ KMD
 000002F0: E92D0A00    ; bus_off     PUSH    {R9, R11}                   ; Protect registers
 000002F4: E51F91E4    ;             LDR     R9, port_b                  ; Load control values memory addr.
 000002F8: E559B000    ;             LDRB    R11, [R9]                   ; Read current values to R11.
-000002FC: E3CBB001    ;             BIC     R11, R11, #:00000001        ; Set E to Low, preserve everything else.
+000002FC: E20BB0FE    ;             AND     R11, R11, #:11111110        ; Set E to Low, preserve everything else.
 00000300: E549B000    ;             STRB    R11, [R9]                   ; Write new control values
 00000304: E8BD0A00    ;             POP     {R9, R11}                   ; Restore registers.
 00000308: E1A0F00E    ;             MOV     PC, LR                      ; Return
@@ -249,7 +249,7 @@ KMD
 00000318: E3A01000    ;             MOV     R1, #0                      ; Reset timer memory to 0.
 0000031C: E50F1268    ;             STR     R1, timer_mem               ; Load 0 to timer memory.
 00000320: E14F1000    ;             MRS     R1, SPSR                    ; Set I bit of SPSR to low.
-00000324: E3C11080    ;             BIC     R1, R1, #:10000000          ; Modify I bit.
+00000324: E201107F    ;             AND     R1, R1, #:01111111          ; Modify I bit to LOW.
 00000328: E161F001    ;             MSR     SPSR_c, R1                  ; Store updated value.
 0000032C: E51F0208    ;             LDR     R0, IRQ_Swi                 ; Enable Interrupt for low button
 00000330: E5501000    ;             LDRB    R1, [R0]                    ; Read current Interrupt switches
@@ -267,16 +267,16 @@ KMD
 00000348: E92D400F    ;             PUSH    {LR, R0-R3}                 ; Protect registers - restore on exit.
 0000034C: E51F322C    ;             LDR     R3, IRQ_Req                 ; Load the IRQ request's memory addr.
 00000350: E5530000    ;             LDRB    R0, [R3]                    ; Load IRQ Request data
-00000354: E3C010FE    ;             BIC     R1, R0, #:11111110          ; Leave only bit 0
+00000354: E2001001    ;             AND     R1, R0, #:00000001          ; Leave only bit 0
 00000358: E3510000    ;             CMP     R1, #:00000000              ; Compare the result.
 0000035C: 1B000031    ;             BLNE    IRQ_clock                   ; If bit 0 is 1, run clock (Time interrupt).
-00000360: E3C010BF    ;             BIC     R1, R0, #:10111111          ; Leave only bit 6
+00000360: E2001040    ;             AND     R1, R0, #:01000000          ; Leave only bit 6
 00000364: E3510000    ;             CMP     R1, #:00000000              ; Compare the result.
-00000368: 1B00000F    ;             BLNE    timer_start                 ; If bit 6 is 1, run LOWER button.
-0000036C: E3C0107F    ;             BIC     R1, R0, #:01111111          ; Leave only bit 7
+00000368: 1B000006    ;             BLNE    IRQ_ubutoon                 ; If bit 6 is 1, run UPPER button.
+0000036C: E2001020    ;             AND     R1, R0, #:00100000          ; Leave only bit 5
 00000370: E3510000    ;             CMP     R1, #:00000000              ; Compare the result.
-00000374: 1B000003    ;             BLNE    IRQ_ubutoon                 ; If bit 7 is 1, run UPPER button.
-00000378: E3C000C1    ;             BIC     R0, R0, #:11000001          ; Clear bit 0, 6, and 7.
+00000374: 1B00000C    ;             BLNE    timer_start                 ; If bit 5 is 1, run LOWER button.
+00000378: E200003E    ;             AND     R0, R0, #:00111110          ; Clear bit 0, 6, and 7.
 0000037C: E5430000    ;             STRB    R0, [R3]                    ; Store new interrupt requests.
 00000380: E8BD400F    ;             POP     {LR, R0-R3}                 ; Restore registers.
 00000384: E1B0F00E    ;             MOVS    PC, LR                      ; Return.
@@ -286,7 +286,7 @@ KMD
 00000388: E92D4001    ; IRQ_ubutoon PUSH    {LR, R0}                    ; Protect registers.
 0000038C: E51F0268    ;             LDR     R0, IRQ_Swi                 ; Load IRQ switches address.
 00000390: E5500000    ;             LDRB    R0, [R0]                    ; Load IRQ switches values.
-00000394: E3C000FE    ;             BIC     R0, R0, #:11111110          ; Leave only bit 0.
+00000394: E2000001    ;             AND     R0, R0, #:00000001          ; Leave only bit 0.
 00000398: E59FE008    ;             LDR     LR, IRQ_ubtn_e              ; Set return address.
 0000039C: E3500001    ;             CMP     R0, #:00000001              ; If time interrupt is HIGH?
 000003A0: 0A00000F    ;             BEQ     timer_stop                  ; Yes, stop timer.
@@ -305,7 +305,7 @@ KMD
 000003C4: E5412000    ;             STRB    R2, [R1]                    ; Store this value.
 000003C8: E51F12A4    ;             LDR     R1, IRQ_Swi                 ; Enable Interrupt for TC.
 000003CC: E5512000    ;             LDRB    R2, [R1]                    ; Read current Enable value
-000003D0: E3C22080    ;             BIC     R2, R2, #:10000000          ; Disable LowButton interrup (this)
+000003D0: E202207F    ;             AND     R2, R2, #:01111111          ; Disable LowButton interrup (this)
 000003D4: E3822041    ;             ORR     R2, R2, #:01000001          ; Enable TC and UpButton interrupt
 000003D8: E5412000    ;             STRB    R2, [R1]                    ; Store updated Enable value.
 000003DC: E8BD0006    ;             POP     {R1-R2}                     ; Restore register.
@@ -316,7 +316,7 @@ KMD
 000003E4: E92D0006    ; timer_stop  PUSH    {R1-R2}                     ; Register protection
 000003E8: E51F12C4    ;             LDR     R1, IRQ_Swi                 ; Disable Interrupt for TC:
 000003EC: E5512000    ;             LDRB    R2, [R1]                    ; Read current Enable value
-000003F0: E3C22001    ;             BIC     R2, R2, #:00000001          ; Set TC interrupt bit to low.
+000003F0: E20220FE    ;             AND     R2, R2, #:11111110          ; Set TC interrupt bit to low.
 000003F4: E3822080    ;             ORR     R2, R2, #:10000000          ; Enable LowButton interrupt (resume).
 000003F8: E5412000    ;             STRB    R2, [R1]                    ; Store updated Enable value.
 000003FC: E8BD0006    ;             POP     {R1-R2}                     ; Restore register.
@@ -334,7 +334,7 @@ KMD
 00000410: E92D0002    ; read_butt   PUSH    {R1}                        ; Register protection.
 00000414: E51F1300    ;             LDR     R1, button                  ; Read data incl. button.
 00000418: E5510000    ;             LDRB    R0, [R1]                    ; Read from memory.
-0000041C: E3C00037    ;             BIC     R0, R0, #:00110111          ; Filter out unneeded data.
+0000041C: E20000C8    ;             AND     R0, R0, #:11001000          ; Filter out unneeded data.
 00000420: E8BD0002    ;             POP     {R1}                        ; Restore register
 00000424: E1A0F00E    ;             MOV     PC, LR                      ; Return.
 00000428:             ;             ; Note on button mapping:
@@ -346,7 +346,7 @@ KMD
 00000428:             ; ; function IRQ_clock: maintain time passed in R6 through TC interrupts.
 00000428: E92D0006    ; IRQ_clock   PUSH    {R1, R2}                    ; Register protection.
 0000042C: E51F1378    ;             LDR     R1, timer_mem               ; Load current timer memory.
-00000430: E2811064    ;             ADD     R1, R1, #100                ; Add 100ms that has passed.
+00000430: E2811001    ;             ADD     R1, R1, #1                  ; Add 100ms that has passed.
 00000434: E50F1380    ;             STR     R1, timer_mem               ; Store updated value to memory.
 00000438: E51F231C    ;             LDR     R2, clock_cmp               ; Load TC address
 0000043C: E5521000    ;             LDRB    R1, [R2]                    ; Load current TC value.
@@ -397,8 +397,7 @@ KMD
 000004DC:             ; ; ----------------------------------------------
 000004DC:             ; ; User Stack Memory
 000004DC:             ; usrStack    DEFS    32
-000004FC: 00000000    ; usrStackTop DEFW    0                           ; First unused location od stack
-00000500:             ; 
+000004FC: 00000000    ; usrStackTop DEFW    0                           ; First unused location on stack
 
 Symbol Table: Labels
 : SVC_entry                         00000008  Local -- ARM
