@@ -319,9 +319,25 @@ timer_stop  PUSH    {R1-R2}                     ; Register protection
 
 ; ----------------------------------------------
 ; function timer_reset: If the UButton is pressed for more than 1000ms, reset timer
-timer_reset PUSH    {R1-R2}                     ; Register protection
-
-            POP     {R1-R2}                     ; Register restoration
+timer_reset PUSH    {R1-R6}                     ; Register protection
+            LDR     R1, clock                   ; Load clock address.
+            LDRB    R2, [R1]                    ; Load current timer value as previous.
+            MOV     R3, #0                      ; Reset counter.
+timer_rstlp LDRB    R4, [R1]                    ; Load current timer value.
+            CMP     R4, R2                      ; Compare with previous.
+            ADDNE   R3, R3, R4                  ; If different, increment counter.
+            SUBNE   R3, R3, R2                  ; If different, subtract previous.
+            MOV     R2, R4                      ; Store current value as previous.
+            LDR     R5, button                  ; Read data incl. button.
+            LDRB    R6, [R5]                    ; Read from memory.
+            AND     R6, R6, #:01000000          ; Filter out unneeded data.
+            CMP     R6, #:00000000              ; If button is not pressed, nothing to do.
+            BEQ     timer_rstfi                 ; Quit current function.
+            CMP     R3, #10                     ; If counter is 1000, reset timer.
+            BNE     timer_rstlp                 ; If not, loop.
+            MOV     R1, #0                      ; Reset timer memory to 0.
+            STR     R1, timer_mem               ; Load 0 to timer memory.
+timer_rstfi POP     {R1-R6}                     ; Register restoration
             MOV     PC, LR                      ; Return.
 
 ; ----------------------------------------------
@@ -356,11 +372,12 @@ IRQ_clock   PUSH    {R1, R2}                    ; Register protection.
 ; USER INSTRUCION, MEMORY, AND PROGRAMS.
 APPLICATION ADR     SP, usrStackTop             ; Initialise the User Stack
             SVC     6                           ; Arm timer.
-inf_loop    B       inf_loop                    ; Let interrupts do the rest!
-            B       inf_loop                    ; Interrupt would return to here!
+            LDR     R0, usrStr                  ; Load string address.
+            SVC     4                           ; Print string.
+irqPending  B       irqPending                  ; Loop here until interrupt.
+            
+            B       inf_loop                    ; Interrupt would return to here.
             SVC     0                           ; Everything. Bye!
-            SVC     4                           ; Reset the LCD unit. Clear everything.
-            SVC     3                           ; Light up the LCD unit.
 
 usrStr      DEFW    "Press any button to start", 0
 
